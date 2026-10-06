@@ -22,11 +22,25 @@
 | `RUN_DIR` | 本轮运行目录，每轮新建；所有中间产物落在它下面 |
 | `FRAMES_ROOT` | 帧图根目录，**必须纯英文路径**（视觉工具不认中文路径） |
 | `DELIVERY_DIR` | 成品交付目录（成品按内容类型分子文件夹） |
-| `SECRETS_DIR` | `bilibili_cookies.txt` / `.env` 所在目录，**不进 git** |
+| `SECRETS_DIR` | `bilibili_cookies.txt` / `.env` 的**正式副本**所在目录，**不进 git** |
 
 脚本侧读环境变量 `BILI_NOTES_WORKSPACE`（中间产物根）、`BILI_NOTES_FRAMES`（帧图根）；
 两者都不设时回落 `~/bilibili-notes/`。下面命令里的 `<RUN_DIR>` / `<FRAMES_ROOT>` 等占位，
 按你自己 `local.<agent>.md` 里的实际值替换。
+
+### 密钥：脚本实际从哪找
+
+`SECRETS_DIR` 是**存放地**，不是脚本读取地——两者不一样，先看清：
+
+- **`bilibili_cookies.txt`** —— 按「当前目录 → `$BILI_NOTES_WORKSPACE` → 脚本所在目录 →
+  `~/bilibili-notes/workspace/`」的顺序找，找不到直接报错。
+  **没有 `--cookies` 参数可传。** 所以每轮开工前，先把 `SECRETS_DIR` 里那份
+  **复制到 `--workspace` 指向的目录**（即 `<RUN_DIR>/work/<内容名>/`）——它就在那儿找。
+- **`.env`（视觉 API key）** —— 只从**脚本所在目录**加载；那儿没有才退回进程环境变量
+  `VISION_API_KEY` / `VISION_BASE_URL` / `VISION_MODEL`。
+  **推荐设成环境变量**，这样密钥完全不必出现在仓库工作区里。
+
+密钥规矩不变：**只读路径、不读内容、不贴进聊天、不进 git。**
 
 ## 三档方案（先定档位再动手）
 
