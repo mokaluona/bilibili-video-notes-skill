@@ -11,7 +11,7 @@
 RUN_DIR:        # 本轮运行目录。每轮新建一个，中间产物全落在它下面
 FRAMES_ROOT:    # 帧图根目录。必须纯英文路径 —— 视觉工具不认中文
 DELIVERY_DIR:   # 成品交付目录。成品按内容类型分子文件夹放在这里
-SECRETS_DIR:    # bilibili_cookies.txt / .env 所在目录。不进 git
+SECRETS_DIR:    # bilibili_cookies.txt 所在目录。不进 git（.env 放仓库根，模板见 .env.example）
 ```
 
 参考写法（**下面是占位示例，按自己的实际情况填**）：

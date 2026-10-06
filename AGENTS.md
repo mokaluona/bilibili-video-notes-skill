@@ -22,7 +22,7 @@
 | `RUN_DIR` | 本轮运行目录，每轮新建；所有中间产物落在它下面 |
 | `FRAMES_ROOT` | 帧图根目录，**必须纯英文路径**（视觉工具不认中文路径） |
 | `DELIVERY_DIR` | 成品交付目录（成品按内容类型分子文件夹） |
-| `SECRETS_DIR` | `bilibili_cookies.txt` / `.env` 的**正式副本**所在目录，**不进 git** |
+| `SECRETS_DIR` | `bilibili_cookies.txt` 的**正式副本**所在目录，**不进 git**（`.env` 不在那儿，见下） |
 
 脚本侧读环境变量 `BILI_NOTES_WORKSPACE`（中间产物根）、`BILI_NOTES_FRAMES`（帧图根）；
 两者都不设时回落 `~/bilibili-notes/`。下面命令里的 `<RUN_DIR>` / `<FRAMES_ROOT>` 等占位，
@@ -36,9 +36,17 @@
   `~/bilibili-notes/workspace/`」的顺序找，找不到直接报错。
   **没有 `--cookies` 参数可传。** 所以每轮开工前，先把 `SECRETS_DIR` 里那份
   **复制到 `--workspace` 指向的目录**（即 `<RUN_DIR>/work/<内容名>/`）——它就在那儿找。
-- **`.env`（视觉 API key）** —— 只从**脚本所在目录**加载；那儿没有才退回进程环境变量
+- **`.env`（视觉 API 配置）** —— 只从**脚本所在目录**加载（= 仓库根）；那儿没有才退回进程环境变量
   `VISION_API_KEY` / `VISION_BASE_URL` / `VISION_MODEL`。
-  **推荐设成环境变量**，这样密钥完全不必出现在仓库工作区里。
+
+**`.env` 就放本仓库根目录**，`bilibili_cookies.txt` 则留 `SECRETS_DIR` —— 两者存放地不同，
+原因是脚本读法不同（cookies 能顺着工作目录找，`.env` 只认脚本旁边）。
+
+- 仓库里进 git 的是 `.env.example`（只有键名），真值在 `.env`，已被 `.gitignore` 挡住。
+  这是**本地开发的通行规范**（Django / Rails / Node 都这么发）。
+- `VISION_BASE_URL` / `VISION_MODEL` 是**运行参数**（这次调谁、调哪个模型），会变；
+  改它们优先用**命令行** `--base-url` / `--model`，不必动 `.env`。
+  不做成全局环境变量：那是机器级配置，会污染全局状态、且被每个子进程继承。
 
 密钥规矩不变：**只读路径、不读内容、不贴进聊天、不进 git。**
 
@@ -92,11 +100,12 @@ python scripts/smart_select.py <FRAMES_ROOT>/<英文>/scene \
   --output-dir <FRAMES_ROOT>/<英文>/selected \
   --skip-clustering
 
-# 3. 并发打分
+# 3. 并发打分（换提供方 / 换模型就加 --base-url / --model，否则用 .env 里的默认值）
 python scripts/score_frames_concurrent.py \
   --frames <FRAMES_ROOT>/<英文>/selected \
   --output <RUN_DIR>/work/<内容名>/vision_scores_p<NN>.json \
-  --workers 8
+  --workers 8 \
+  --base-url https://api.siliconflow.cn/v1 --model Qwen/Qwen3-VL-8B-Instruct
 
 # 4. 按分数推荐 Top 10，自动复制到 final/
 python scripts/recommend_frames.py \
@@ -144,7 +153,8 @@ python scripts/verify_docx.py <交付的 docx> \
   从 `data.subtitle.subtitles[0].subtitle_url` 拿 ai-zh 字幕 —— **可靠方式**
 - yt-dlp `--write-subs` 和 `player/v2` 接口对部分视频拿不到字幕
 - cookie 是 Netscape 格式（仅含 SESSDATA）
-- `bilibili_cookies.txt` / `.env` 放在 `SECRETS_DIR`：**不读内容、不贴进聊天、不进 git**
+- `bilibili_cookies.txt` 放 `SECRETS_DIR`；`.env` 放仓库根（见上文「密钥：脚本实际从哪找」）。
+  两者都：**不读内容、不贴进聊天、不进 git**
 
 ## 笔记写作标准
 
