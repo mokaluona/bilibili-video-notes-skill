@@ -31,7 +31,7 @@
 ```
 请帮我安装 bilibili-video-notes-skill：
 
-git clone https://github.com/asdhabdua/bilibili-video-notes-skill.git
+git clone https://github.com/mokaluona/bilibili-video-notes-skill.git
 cd bilibili-video-notes-skill
 pip install -r scripts/requirements.txt
 
@@ -48,7 +48,7 @@ pip install -r scripts/requirements.txt
 - 🧠 **AI视觉打分**，选出每个知识点最完整的一帧
 - 📝 **融合字幕+截图内容**生成结构化DOCX笔记
 - 🧹 **自动清理**临时文件，不占多余空间
-- 🤖 **多 Agent 支持**：Hermes / Claude Code / Codex CLI
+- 🤖 **多 Agent 支持**：Kimi / Claude Code / Codex CLI
 
 ## 📊 效果对比
 
@@ -65,7 +65,7 @@ pip install -r scripts/requirements.txt
 ### 1. 克隆安装
 
 ```bash
-git clone https://github.com/asdhabdua/bilibili-video-notes-skill.git
+git clone https://github.com/mokaluona/bilibili-video-notes-skill.git
 cd bilibili-video-notes-skill
 pip install -r scripts/requirements.txt
 ```
@@ -100,6 +100,17 @@ cp bilibili_cookies.txt.example bilibili_cookies.txt
 
 > ⚠️ Cookie 有时效（通常几天），过期后需重新获取。
 
+### 5. 配置本机层路径
+
+仓库本身不含任何绝对路径。复制模板并填上你这台机器的实际路径：
+
+```bash
+cp local.example.md local.<agent>.md
+```
+
+填四项：运行目录 / 帧图根（**必须纯英文路径**）/ 交给用户的成品目录 / 密钥目录。
+`local.*.md` 已 git 忽略，不会被推走。详见 [AGENTS.md](AGENTS.md)。
+
 ---
 
 ## 🚀 详细使用教程
@@ -109,7 +120,7 @@ cp bilibili_cookies.txt.example bilibili_cookies.txt
 #### 1.1 克隆仓库
 
 ```bash
-git clone https://github.com/asdhabdua/bilibili-video-notes-skill.git
+git clone https://github.com/mokaluona/bilibili-video-notes-skill.git
 cd bilibili-video-notes-skill
 ```
 
@@ -224,11 +235,11 @@ cp bilibili_cookies.txt.example bilibili_cookies.txt
 
 你不需要自己动手配置。把下面的提示词复制粘贴给 AI，它会帮你完成安装、配置，你只需要告诉他你的api、baseurl、模型名和SESSDATA(如何获得SESSDATA可见上一步)。
 
-#### Hermes Agent 版
+#### Kimi 版
 
 ```
 首先，帮我完成初始化配置：
-1. 克隆本仓库到当前工作目录：git clone https://github.com/asdhabdua/bilibili-video-notes-skill.git
+1. 克隆本仓库到当前工作目录：git clone https://github.com/mokaluona/bilibili-video-notes-skill.git
 2. 进入项目目录并安装依赖：pip install -r scripts/requirements.txt
 3. 确保系统可以调用 ffmpeg（如果没有，请帮我安装并加入 PATH）
 4. 从 templates/env.example 复制出 .env，然后问我 API 配置（VISION_API_KEY、VISION_BASE_URL、VISION_MODEL），填入后给我确认
@@ -246,7 +257,7 @@ cp bilibili_cookies.txt.example bilibili_cookies.txt
 
 ```
 首先做初始化配置：
-1. git clone https://github.com/asdhabdua/bilibili-video-notes-skill.git
+1. git clone https://github.com/mokaluona/bilibili-video-notes-skill.git
 2. cd bilibili-video-notes-skill
 3. pip install -r scripts/requirements.txt
 4. 检查 ffmpeg 是否存在，不存在则帮我安装
@@ -260,7 +271,7 @@ cp bilibili_cookies.txt.example bilibili_cookies.txt
 
 ```
 首先完成初始化配置：
-1. git clone https://github.com/asdhabdua/bilibili-video-notes-skill.git
+1. git clone https://github.com/mokaluona/bilibili-video-notes-skill.git
 2. cd bilibili-video-notes-skill
 3. pip install -r scripts/requirements.txt
 4. 确保 ffmpeg 可用
@@ -284,7 +295,7 @@ cp bilibili_cookies.txt.example bilibili_cookies.txt
 
 只需要告诉 AI一句话，它就会跟踪完整流程：
 
-### Hermes Agent 版
+### Kimi 版
 
 ```
 请帮我做这个视频的笔记：https://www.bilibili.com/video/BV1xx411c7mD
@@ -375,14 +386,16 @@ AI 生成的 DOCX 可能需要你微调：
 
 ## 🔧 命令参考
 
+> 本节的流程以 [`AGENTS.md`](AGENTS.md) 为准；两边不一致时**以 `AGENTS.md` 为准**。
+
 ### 1. 抽帧
 
 ```bash
 python scripts/extract_frames.py BV1xx411c7mD \
   --page 1 \
-  --mode cover \
+  --mode scene --backup-interval 30 \
   --subtitle \
-  --workspace ./workspace \
+  --workspace ./work/<内容名> \
   --frames ./frames/pXX
 ```
 
@@ -399,19 +412,20 @@ python scripts/smart_select.py ./frames/pXX/fixed \
 ```bash
 python scripts/score_frames_concurrent.py \
   --frames ./frames/pXX/selected \
-  --output ./workspace/vision_scores_pXX.json \
-  --workers 16
+  --output ./work/<内容名>/vision_scores_pXX.json \
+  --workers 8
 ```
 
-### 4. 人工选最终帧
+### 4. AI 推荐选帧
 
-根据 `vision_scores_pXX.json` 的 score 和 theme，人工(其实就是你的模型)决定最终使用哪几帧。
+`recommend_frames.py` 按打分自动推荐 Top 10 并复制到 `final/`；人工只需确认这 10 帧，要调整再从 `selected/` 补。
 
 ```bash
-mkdir -p ./frames/pXX/final
-cp ./frames/pXX/selected/frame_0003.jpg ./frames/pXX/final/
-cp ./frames/pXX/selected/frame_0007.jpg ./frames/pXX/final/
-# ...
+python scripts/recommend_frames.py \
+  --scores ./work/<内容名>/vision_scores_pXX.json \
+  --frames ./frames/pXX/selected \
+  --output ./frames/pXX/final \
+  --top 10 --auto-copy
 ```
 
 ### 5. 提取图中内容
@@ -419,34 +433,38 @@ cp ./frames/pXX/selected/frame_0007.jpg ./frames/pXX/final/
 ```bash
 python scripts/score_frames_concurrent.py \
   --frames ./frames/pXX/final \
-  --output ./workspace/vision_extract_pXX.json \
+  --output ./work/<内容名>/vision_extract_pXX.json \
   --mode extract \
-  --workers 16
+  --workers 1 --resume
 ```
 
 ### 6. 生成 DOCX
 
 ```bash
-cp templates/docx_note_v2.py ./workspace/gen_pXX_v1.py
-# 编辑 gen_pXX_v1.py 填入 TITLE/SOURCE/FRAMES/SECTIONS
-python ./workspace/gen_pXX_v1.py
+# 先自动生成配置骨架,再人工润色
+python scripts/generate_config_draft.py \
+  --vision ./work/<内容名>/vision_extract_pXX.json \
+  --title "章节标题" --source "来源说明" \
+  --frames-dir ./frames/pXX/final \
+  --output ./work/<内容名>/config_pXX_draft.json
+python templates/gen_docx_dynamic.py --config ./work/<内容名>/config_pXX_draft.json
 ```
 
 ### 7. 验证
 
 ```bash
-python scripts/verify_docx.py ./workspace/<output>.docx --subtitle ./workspace/<BV>_p<N>_subtitles.txt
+python scripts/verify_docx.py ./work/<内容名>/<output>.docx --subtitle ./work/<内容名>/<BV>_p<N>_subtitles.txt
 ```
 
 ### 8. 清理
 
 ```bash
-rm -f ./workspace/BV1xx411c7mD_p1.mp4
-rm -f ./workspace/BV1xx411c7mD_p1_subtitles.json
-rm -f ./workspace/gen_pXX_v1.py
+rm -f ./work/<内容名>/BV1xx411c7mD_p1.mp4
+rm -f ./work/<内容名>/BV1xx411c7mD_p1_subtitles.json
+rm -f ./work/<内容名>/gen_pXX_v1.py
 ```
 
-保留：字幕.txt、笔记.docx、vision_scores_pXX.json、vision_extract_pXX.json、checklist_pXX.json
+保留：字幕.txt、vision_extract_pXX.json、checklist_pXX.json —— mp4 / wav / 帧图 / scores.json 删掉（可重生成）
 
 ---
 
@@ -455,12 +473,13 @@ rm -f ./workspace/gen_pXX_v1.py
 | 环境变量 / 参数 | 说明 | 示例 |
 |---|---|---|
 | `.env` | API key / base_url / model | 见 templates/env.example |
-| `--workspace` | 工作区目录 | `./workspace` |
+| `--workspace` | 工作区目录 | `./work/<内容名>` |
 | `--frames` | 帧输出目录 | `./frames/pXX` |
 | `--page` | B 站分P页码 | `1` |
-| `--mode cover` | 每10秒抽一帧 | - |
+| `--mode scene` | 按画面切换点抽帧（**默认走这个**） | - |
+| `--mode cover` | 每10秒抽一帧（仅画面连续变化时用） | - |
 | `--skip-clustering` | 保留所有去重帧 | - |
-| `--workers` | 并发线程数 | `16` |
+| `--workers` | 并发线程数 | 打分 `8` / 提取 `1` |
 | `--mode extract` | 从图中提取完整内容 | - |
 
 ---
@@ -498,7 +517,7 @@ AI 视觉工具可能无法识别中文路径。
 
 ## 🤖 Agent 使用
 
-### Hermes Agent
+### Kimi
 
 直接读取 `SKILL.md`，按里面的流程执行。
 
@@ -516,27 +535,35 @@ AI 视觉工具可能无法识别中文路径。
 
 ```
 bilibili-video-notes/
-├── README.md
-├── SKILL.md                    # Hermes Agent
-├── CLAUDE.md                   # Claude Code
-├── AGENTS.md                   # Codex CLI
-├── CONTRIBUTING.md             # 贡献指南
+├── AGENTS.md                   # 项目指令唯一真源
+├── README.md                   # 本文件
+├── SKILL.md                    # Kimi / 通用 skill 入口（指针）
+├── CLAUDE.md                   # Claude Code（指针）
+├── CONTRIBUTING.md             # 贡献指南（指针）
+├── local.example.md            # 本机层配置模板 → 复制成 local.<agent>.md
 ├── .gitignore
 ├── bilibili_cookies.txt.example
 ├── scripts/
 │   ├── extract_frames.py
 │   ├── smart_select.py
+│   ├── quick_dedup.py
 │   ├── score_frames_concurrent.py
+│   ├── recommend_frames.py
 │   ├── extract_key_sentences.py
+│   ├── generate_config_draft.py
 │   ├── verify_docx.py
 │   ├── verify_checklist.py
 │   ├── clean_markdown_bold.py
 │   └── requirements.txt
-├── templates/
-│   ├── docx_note_v2.py
-│   ├── env.example
-│   └── checklist.json
+└── templates/
+    ├── gen_docx_dynamic.py
+    ├── docx_note_v2.py
+    ├── env.example
+    └── checklist.json
 ```
+
+**`local.<agent>.md` 不进 git** —— 每台机器、每个 agent 自己的路径写在那里，
+仓库本身不含任何绝对路径。
 
 ---
 

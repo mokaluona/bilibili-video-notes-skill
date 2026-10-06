@@ -32,7 +32,7 @@
 - 不要将 `.env` 或 `bilibili_cookies.txt` 提交到 Git
 - 不要提交视频文件、帧图片、字幕文件等大文件
 - 不要在文档中写入个人路径或隐私信息
-- 更新 README 和相关 Agent 文件（SKILL.md / CLAUDE.md / AGENTS.md）保持一致
+- 项目指令的**唯一真源是 `AGENTS.md`**；`SKILL.md` / `CLAUDE.md` 只是指针，不需要同步
 
 ## 联系方式
 - **提建议/报Bug**：[GitHub Issues](https://github.com/asdhabdua/bilibili-video-notes-skill/issues/new)

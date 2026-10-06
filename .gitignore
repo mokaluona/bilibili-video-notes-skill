@@ -2,10 +2,18 @@
 .env
 bilibili_cookies.txt
 
+# 本机层配置：每台机器 / 每个 agent 各一份，绝不进 git
+local.*.md
+!local.example.md
+
 # 视频文件
 *.mp4
 *.flv
 *.mkv
+
+# 音频中间件（ASR 用，单文件 55–95 MB）
+*.wav
+*.m4a
 
 # 字幕原始数据（保留 txt）
 *_subtitles.json
@@ -15,8 +23,10 @@ frames/
 fixed/
 selected/
 
-# 工作区临时文件
+# 工作区临时文件（每轮中间产物，不进版本库）
 workspace/
+work/
+output/
 *.log
 
 # 生成的笔记
