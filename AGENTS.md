@@ -141,9 +141,12 @@ python templates/gen_docx_dynamic.py \
 # 产物 → <DELIVERY_DIR>/<内容类型>/
 
 # 9. 验证 + 清理
-# lecture 阈值 75%，无字幕自动跳过，失败时按优先级输出缺失句
+# --type 按视频性质选，选错会把合格的笔记判成 FAIL：
+#   lecture 讲课/教程（阈值 75%）、opinion 经验分享/观点谈（阈值 50%，先滤口头禅）、
+#   vlog 杂谈（不查覆盖率）
+# 无字幕时自动跳过覆盖率检查，失败时按优先级输出缺失句
 python scripts/verify_docx.py <交付的 docx> \
-  --type lecture --subtitle <RUN_DIR>/work/<内容名>/<BV>_p<N>_subtitles.txt
+  --type <lecture|opinion|vlog> --subtitle <RUN_DIR>/work/<内容名>/<BV>_p<N>_subtitles.txt
 ```
 
 ## 字幕获取
@@ -171,7 +174,9 @@ python scripts/verify_docx.py <交付的 docx> \
 - **选帧 `recommend_frames.py`**：打分后自动推荐 Top 10，人工只看 10 帧。
 - **骨架生成 `generate_config_draft.py`**：从 `vision_extract.json` + 字幕自动生成 DOCX 配置骨架，
   人工只需润色。
-- **验证 `verify_docx.py`**：lecture 类型阈值 75%，无字幕时跳过覆盖率检查。
+- **验证 `verify_docx.py`**：`--type` 决定覆盖率阈值——lecture 75%、opinion 50%（滤口头禅）、vlog 不查。
+  经验分享类视频的关键句多是口语碎片，按 lecture 口径打容易差一两个点误判，**按视频性质选对类型**；
+  无字幕时跳过覆盖率检查。
 - 视觉模型用 SiliconFlow `Qwen/Qwen3-VL-8B-Instruct`（约 2s/帧）；**勿用 32B**（排队严重，>75s 超时）。
 - SiliconFlow 限流：打分 `--workers 8` 可以；**提取必须串行（`--workers 1`）+ 增量存盘 + 失败跳过**。
 - 所有视觉分析走 `score_frames_concurrent.py`，不要用串行 `vision_analyze`。
