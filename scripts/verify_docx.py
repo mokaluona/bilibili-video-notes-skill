@@ -52,12 +52,12 @@ FILLER_PATTERNS = [
 ]
 
 
+_PUNCT_RE = re.compile(r"[\s。，、！？；：\"'“”‘’（）()\[\]【】]")
+
+
 def normalize_text(text: str) -> str:
     """归一化文本用于模糊匹配。"""
-    text = text.lower()
-    # 去掉常见标点、空格
-    text = re.sub(r"[\s。，、！？；：""''（）()\[\]【】]", "", text)
-    return text
+    return _PUNCT_RE.sub("", text.lower())
 
 
 def contains_fuzzy(haystack: str, needle: str, min_chars: int = 6) -> bool:
@@ -188,11 +188,12 @@ def verify(docx_path: str, keywords: list, min_images: int = 1,
         print(f"  [FAIL] too few images")
         return False
 
+    # 表格只作提示，不作硬门。有些 PPT 里图表是图片、笔记里并不需要 Word 表格；
+    # 原先这里一 FAIL 就 return，把后面真正该看的字幕覆盖率检查整个挡掉了。
     tbl_count = xml.count("<w:tbl>")
     print(f"[3] tables: {tbl_count} (expect >= 1)")
     if tbl_count < 1:
-        print(f"  [FAIL] no tables")
-        return False
+        print(f"  [WARN] no tables")
 
     if keywords:
         missing = [k for k in keywords if k not in xml]

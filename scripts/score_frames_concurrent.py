@@ -198,7 +198,9 @@ def process_one_frame(
             content = data["choices"][0]["message"]["content"]
             parsed = parse_json_response(content)
 
-            # 根据不同模式保留字段
+            # 模型返回的字段全部提到顶层：留 raw 供排查，但不要让
+            # text/concepts/reasoning/tables 只活在 raw 字符串里——
+            # 下游 generate_config_draft.py 读的是顶层，锁在 raw 里它就取不到。
             result = {
                 "theme": str(parsed.get("theme", "")),
                 "score": int(parsed.get("score", 0)),
@@ -208,6 +210,8 @@ def process_one_frame(
                 "attempts": attempt,
                 "timestamp": datetime.now().isoformat()
             }
+            for key, value in parsed.items():
+                result.setdefault(key, value)
             return frame_name, result
 
         except Exception as e:

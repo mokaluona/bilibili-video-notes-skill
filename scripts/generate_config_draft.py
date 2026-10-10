@@ -48,6 +48,36 @@ def extract_keywords(theme: str) -> set:
     return {w for w in words if len(w) >= 2 and w not in stopwords}
 
 
+def char_bigrams(text: str) -> set:
+    """字符二元组。中文没有空格，按词切分切不出词，
+    上面那个 extract_keywords 对纯中文主题只会返回一整句、交集恒为空，
+    所以中文重叠判断改用二元组。"""
+    cleaned = re.sub(r"[\s　。，、！？；：\"'“”‘’（）()\[\]【】/\\+]+", "", text or "")
+    return {cleaned[i:i + 2] for i in range(len(cleaned) - 1)}
+
+
+def load_frame_payload(data: dict) -> dict:
+    """统一读取一条帧记录。
+
+    新格式把模型返回的字段平铺在顶层；旧格式（本改动之前跑出来的产物）
+    只有一个 raw 字符串装着全部字段。这里补一次解析，免得为了兼容旧产物
+    重跑一遍要花钱的视觉提取。"""
+    if 'concepts' in data or 'reasoning' in data or 'text' in data:
+        return data
+    raw = data.get('raw')
+    if not isinstance(raw, str) or not raw.strip():
+        return data
+    try:
+        parsed = json.loads(raw)
+    except (ValueError, TypeError):
+        return data
+    if not isinstance(parsed, dict):
+        return data
+    merged = dict(parsed)
+    merged.update(data)
+    return merged
+
+
 def cluster_frames(frames_data: dict, similarity_threshold: float = 0.35) -> list:
     """
     按 theme 相似度对帧进行聚类。
@@ -105,25 +135,35 @@ def build_sections(groups: list, key_sentences: list = None) -> list:
         all_reasonings = []
         all_tables = []
         
-        for data in g_data:
-            concepts = data.get('concepts', [])
+        all_texts = []
+
+        for data in map(load_frame_payload, g_data):
+            concepts = data.get('concepts', []) or []
             reasoning = data.get('reasoning', '')
-            tables = data.get('tables', [])
-            
+            tables = data.get('tables', []) or []
+
             for c in concepts:
                 if c and c not in all_concepts:
                     all_concepts.append(c)
-            
+
             if reasoning and reasoning != 'None' and reasoning not in all_reasonings:
                 all_reasonings.append(reasoning)
-            
+
             for t in tables:
                 if t not in all_tables:
                     all_tables.append(t)
-        
-        # 填入 concepts 作为 body
-        for c in all_concepts[:3]:  # 每个组最多 3 个 concept，避免太长
-            sections.append(['body', c])
+
+            text = data.get('text') or ''
+            if text and text not in all_texts:
+                all_texts.append(text)
+
+        # 填入 concepts 作为 body；一条都没有时退回整页文字，
+        # 免得骨架只剩标题和图片（那就等于没生成正文）。
+        if all_concepts:
+            for c in all_concepts[:3]:  # 每个组最多 3 个 concept，避免太长
+                sections.append(['body', c])
+        elif all_texts:
+            sections.append(['body', all_texts[0]])
         
         # 填入 reasoning 作为 why
         for r in all_reasonings[:1]:  # 每个组最多 1 个 reasoning
@@ -136,17 +176,23 @@ def build_sections(groups: list, key_sentences: list = None) -> list:
             if headers and rows:
                 sections.append(['table', headers, rows])
         
-        # 尝试匹配字幕关键句
+        # 尝试匹配字幕关键句。中文按字符二元组重叠（按词切分对中文无效）。
+        # theme 是 AI 概括的长句、字幕是口语碎片，两者重叠天然就低，
+        # 所以用相对判据（重叠占比）而不是绝对条数，否则短句靠常见词就能蒙上。
         if key_sentences:
+            theme_bg = char_bigrams(g_title)
             matched = []
             for ks in key_sentences:
-                # 简单匹配：如果关键句中的关键词与主题关键词有重叠
-                ks_keywords = extract_keywords(ks)
-                theme_keywords = extract_keywords(g_title)
-                if len(ks_keywords & theme_keywords) >= 1 and ks not in used_key_sentences:
+                if ks in used_key_sentences:
+                    continue
+                ks_bg = char_bigrams(ks)
+                if not ks_bg:
+                    continue
+                overlap = len(ks_bg & theme_bg)
+                if overlap >= 2 and overlap / len(ks_bg) >= 0.25:
                     matched.append(ks)
                     used_key_sentences.add(ks)
-            
+
             for m in matched[:2]:  # 每个组最多 2 条字幕关键句
                 # 去掉时间戳前缀
                 clean = re.sub(r'^\[\d+m\d+s\]\s*', '', m)
@@ -197,6 +243,8 @@ def main():
     parser.add_argument('--source', '-s', required=True, help='视频来源说明')
     parser.add_argument('--frames-dir', '-f', required=True, help='final 帧目录路径')
     parser.add_argument('--output', '-o', required=True, help='输出 JSON 路径')
+    parser.add_argument('--docx-path', default=None,
+                        help='DOCX 最终落点（交付目录里的完整路径）。不给就默认放在 JSON 旁边')
     parser.add_argument('--similarity', type=float, default=0.35, help='theme 聚类相似度阈值 (默认 0.35)')
     args = parser.parse_args()
 
@@ -234,7 +282,7 @@ def main():
     config = {
         'TITLE': args.title,
         'SOURCE': args.source,
-        'OUTPUT_PATH': args.output.replace('_draft.json', '.docx').replace('config_', ''),
+        'OUTPUT_PATH': args.docx_path or args.output.replace('_draft.json', '.docx').replace('config_', ''),
         'FRAMES_DIR': args.frames_dir,
         'FRAMES': frames_dict,
         'SUMMARY': summary,

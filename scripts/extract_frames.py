@@ -21,13 +21,48 @@ B站视频智能抽帧 + 字幕下载工具
 """
 
 import argparse
+import importlib.util
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import glob
 from pathlib import Path
+
+
+# ============================================================
+# 外部命令解析
+#
+# 原先这里直接调裸命令 `yt-dlp` / `ffmpeg` / `ffprobe`，隐含假设它们在本进程的
+# PATH 上。但 pip 把 yt-dlp 装进 venv 时，`<venv>/Scripts` 默认不在 PATH 上——
+# 于是「按 AGENTS.md 装了依赖、照命令跑」的人必然撞 FileNotFoundError。
+# yt-dlp 优先用 `python -m yt_dlp`（和本脚本同一个解释器，一定找得到）；
+# ffmpeg / ffprobe 没有模块形式，按 环境变量 → PATH 的顺序找。
+# ============================================================
+def _resolve_binary(name: str, env_var: str) -> str:
+    """按 <env_var> → PATH 的顺序解析外部二进制，都没找到就返回原名（让系统再报错）。"""
+    explicit = os.environ.get(env_var)
+    if explicit:
+        if os.path.isfile(explicit):
+            return explicit
+        candidate = os.path.join(explicit, name + (".exe" if os.name == "nt" else ""))
+        if os.path.isfile(candidate):
+            return candidate
+    return shutil.which(name) or name
+
+
+def _ytdlp_prefix() -> list:
+    """yt-dlp 的调用前缀。模块可用就用同解释器的 `-m yt_dlp`。"""
+    if importlib.util.find_spec("yt_dlp") is not None:
+        return [sys.executable, "-m", "yt_dlp"]
+    return [_resolve_binary("yt-dlp", "YTDLP_BIN")]
+
+
+YTDLP = _ytdlp_prefix()
+FFMPEG = _resolve_binary("ffmpeg", "FFMPEG_BIN")
+FFPROBE = _resolve_binary("ffprobe", "FFPROBE_BIN")
 
 
 # ============================================================
@@ -93,7 +128,7 @@ def get_video_info(bvid: str) -> dict:
 
 def get_cookie_value(cookie_file: str, name: str) -> str:
     """Extract a specific cookie value from Netscape cookie file."""
-    with open(cookie_file, "r") as f:
+    with open(cookie_file, "r", encoding="utf-8", errors="replace") as f:
         for line in f:
             line = line.strip()
             if line.startswith("#") or not line:
@@ -202,7 +237,7 @@ def download_video(bvid: str, page: int, start: str = None, end: str = None) -> 
 
     url = f"https://www.bilibili.com/video/{bvid}?p={page}"
     cmd = [
-        "yt-dlp",
+        *YTDLP,
         "--cookies", COOKIE_FILE,
         "-f", "bestvideo[height<=720]+bestaudio/best[height<=720]",
         "-o", output_path,
@@ -227,7 +262,7 @@ def download_video(bvid: str, page: int, start: str = None, end: str = None) -> 
     # 打印实际分辨率
     try:
         probe = subprocess.run(
-            ["ffprobe", "-v", "error", "-select_streams", "v:0",
+            [FFPROBE, "-v", "error", "-select_streams", "v:0",
              "-show_entries", "stream=width,height", "-of", "csv=p=0", output_path],
             capture_output=True, text=True
         )
@@ -250,7 +285,7 @@ def extract_fixed_frames(video_path: str, interval: int = 30) -> list:
         os.remove(f)
 
     cmd = [
-        "ffmpeg", "-y", "-i", video_path,
+        FFMPEG, "-y", "-i", video_path,
         "-vf", f"fps=1/{interval}",
         "-q:v", "2",
         os.path.join(out_dir, "frame_%04d.jpg"),
@@ -268,7 +303,7 @@ def extract_fixed_frames(video_path: str, interval: int = 30) -> list:
 def get_video_duration(video_path: str) -> float:
     """Get video duration in seconds using ffprobe."""
     cmd = [
-        "ffprobe", "-v", "error",
+        FFPROBE, "-v", "error",
         "-show_entries", "format=duration",
         "-of", "default=noprint_wrappers=1:nokey=1",
         video_path,
@@ -297,7 +332,7 @@ def extract_scene_frames(video_path: str, threshold: float = 0.04, merge_gap: fl
 
     # Pass 1: detect scene change timestamps
     cmd = [
-        "ffmpeg", "-y", "-i", video_path,
+        FFMPEG, "-y", "-i", video_path,
         "-vf", f"select='gt(scene,{threshold})',showinfo",
         "-fps_mode", "vfr",
         "-q:v", "2",
@@ -366,7 +401,7 @@ def extract_scene_frames(video_path: str, threshold: float = 0.04, merge_gap: fl
     for i, ts in enumerate(key_timestamps):
         out_file = os.path.join(out_dir, f"frame_{i+1:04d}_{seconds_to_time(ts)}.jpg")
         cmd = [
-            "ffmpeg", "-y", "-ss", str(ts),
+            FFMPEG, "-y", "-ss", str(ts),
             "-i", video_path,
             "-frames:v", "1",
             "-q:v", "2",
