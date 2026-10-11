@@ -30,6 +30,8 @@ import sys
 import re
 import zipfile
 import argparse
+import json
+from xml.etree import ElementTree as ET
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
 from extract_key_sentences import extract_key_sentences
@@ -57,7 +59,7 @@ _PUNCT_RE = re.compile(r"[\s。，、！？；：\"'“”‘’（）()\[\]【�
 
 def normalize_text(text: str) -> str:
     """归一化文本用于模糊匹配。"""
-    return _PUNCT_RE.sub("", text.lower())
+    return _PUNCT_RE.sub("", re.sub(r"\[\d+(?:m\d+s|:\d+(?::\d+)?)\]", "", text.lower()))
 
 
 def contains_fuzzy(haystack: str, needle: str, min_chars: int = 6) -> bool:
@@ -163,8 +165,27 @@ def sort_missing_by_priority(missing: list) -> list:
     return sorted(missing, key=score_sentence_priority, reverse=True)
 
 
+def check_coverage_map(docx_text, path):
+    """Validate a source-grounded manual review; this does not infer semantics."""
+    data = json.load(open(path,encoding='utf-8'))
+    topics = data.get('topics', [])
+    if data.get('reviewed_against_source') is not True or not topics:
+        print('[FAIL] Coverage map needs source review and nonempty topics')
+        return False
+    failures=[]
+    for topic in topics:
+        evidence=topic.get('docx_evidence','')
+        if not (topic.get('topic') and topic.get('source_ref') and topic.get('review_note')
+                and topic.get('covered') is True and len(evidence.strip())>=8
+                and normalize_text(evidence) in normalize_text(docx_text)):
+            failures.append(topic.get('topic','unnamed'))
+    print(f'[8] Source-grounded manual coverage: {len(topics)-len(failures)}/{len(topics)} topics')
+    if failures: print(f'[FAIL] Missing or unsubstantiated topics: {failures}')
+    return not failures
+
+
 def verify(docx_path: str, keywords: list, min_images: int = 1,
-           subtitle_path: str = None, video_type: str = 'lecture') -> bool:
+           subtitle_path: str = None, video_type: str = 'lecture', coverage_map: str = None) -> bool:
     if not os.path.exists(docx_path):
         print(f"[FAIL] file not found: {docx_path}")
         return False
@@ -183,6 +204,9 @@ def verify(docx_path: str, keywords: list, min_images: int = 1,
         print(f"[FAIL] {docx_path} is not a valid docx (zip)")
         return False
 
+    docx_text = '\n'.join(node.text or '' for node in ET.fromstring(xml).iter('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t'))
+    if coverage_map and not check_coverage_map(docx_text,coverage_map):
+        return False
     print(f"[2] embedded images: {len(media)} (expect >= {min_images})")
     if len(media) < min_images:
         print(f"  [FAIL] too few images")
@@ -222,12 +246,14 @@ def verify(docx_path: str, keywords: list, min_images: int = 1,
             print(f"  [WARN] 无字幕文件，跳过覆盖率检查（请确认视频是否有字幕）")
         else:
             missing_sentences, coverage, total = check_subtitle_coverage(
-                xml, subtitle_path, video_type=video_type
+                docx_text, subtitle_path, video_type=video_type
             )
             threshold = get_coverage_threshold(video_type)
             print(f"[7] subtitle key causal sentence coverage: {coverage * 100:.1f}% "
                   f"({total} total, {len(missing_sentences)} missing, type={video_type}, threshold={threshold*100:.0f}%)")
-            if coverage < threshold:
+            if coverage < threshold and coverage_map:
+                print('[WARN] Literal subtitle matching below threshold; source-grounded manual map passed. This is not an automatic semantic score.')
+            elif coverage < threshold:
                 # 按优先级排序缺失句，信息量大的排前面
                 missing_sorted = sort_missing_by_priority(missing_sentences)
                 print(f"  [FAIL] coverage < {threshold*100:.0f}%, missing key sentences (sorted by priority):")
@@ -255,8 +281,9 @@ if __name__ == "__main__":
     parser.add_argument("--subtitle", default=None, help="字幕 TXT 路径，用于检查关键因果句覆盖")
     parser.add_argument("--type", default="lecture", choices=["lecture", "opinion", "vlog"],
                         help="视频类型: lecture=讲课(75%%), opinion=观点分享(50%%), vlog=不检查覆盖")
+    parser.add_argument('--coverage-map', help='人工对照原字幕/截图核验的知识点清单；逐字匹配仅作辅助')
     args = parser.parse_args()
 
     ok = verify(args.docx_path, args.keywords, min_images=args.min_images,
-                subtitle_path=args.subtitle, video_type=args.type)
+                subtitle_path=args.subtitle, video_type=args.type, coverage_map=args.coverage_map)
     sys.exit(0 if ok else 1)

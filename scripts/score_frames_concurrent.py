@@ -54,6 +54,7 @@ import json
 import time
 import argparse
 import traceback
+import hashlib
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -74,7 +75,7 @@ except ImportError:
 DEFAULT_BASE_URL = os.getenv('VISION_BASE_URL', os.getenv('SOPHNET_BASE_URL', "https://api.openai.com/v1"))
 DEFAULT_MODEL = os.getenv('VISION_MODEL', os.getenv('SOPHNET_MODEL', "gpt-4o"))
 DEFAULT_API_KEY = os.getenv('VISION_API_KEY', os.getenv('SOPHNET_API_KEY', ""))
-DEFAULT_WORKERS = 16
+DEFAULT_WORKERS = 8
 DEFAULT_TIMEOUT = 120
 DEFAULT_MAX_RETRIES = 3
 
@@ -232,6 +233,22 @@ def process_one_frame(
     return frame_name, error_result
 
 
+def cache_identity(frame, mode, model, base_url, prompt):
+    return hashlib.sha256(frame.read_bytes() + json.dumps([mode,model,base_url,prompt]).encode()).hexdigest()
+
+def reusable_result(result, identity, mode):
+    return (isinstance(result,dict) and not result.get('error')
+            and result.get('_cache_key') == identity
+            and bool(result.get('theme')) and isinstance(result.get('score'),int)
+            and (mode == 'score' or 'text' in result))
+
+def save_results(path, results):
+    path = Path(path); path.parent.mkdir(parents=True,exist_ok=True)
+    temp = path.with_name(path.name + '.tmp')
+    temp.write_text(json.dumps(results,ensure_ascii=False,indent=2),encoding='utf-8')
+    temp.replace(path)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="bilibili-video-notes: 并发视觉分析"
@@ -246,7 +263,7 @@ def main():
                         help=f"模型基础 URL，默认 {DEFAULT_BASE_URL}")
     parser.add_argument("--model", default=DEFAULT_MODEL,
                         help=f"模型 ID，默认 {DEFAULT_MODEL}")
-    parser.add_argument("--workers", type=int, default=DEFAULT_WORKERS,
+    parser.add_argument("--workers", type=int, default=None,
                         help=f"并发线程数，默认 {DEFAULT_WORKERS}")
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT,
                         help=f"单请求超时秒数，默认 {DEFAULT_TIMEOUT}")
@@ -256,6 +273,10 @@ def main():
                         help="断点续传：跳过已存在于输出 JSON 中的帧")
     args = parser.parse_args()
 
+    if args.workers is None:
+        args.workers = 1 if args.mode == 'extract' else DEFAULT_WORKERS
+    if args.mode == 'extract' and args.workers != 1:
+        parser.error('extract mode requires --workers 1 to avoid provider throttling')
     if not args.api_key:
         print("[ERROR] 缺少 API key。请设置环境变量 VISION_API_KEY 或使用 --api-key")
         sys.exit(1)
@@ -274,10 +295,12 @@ def main():
     print(f"[INFO] 模式={args.mode}，发现 {len(frames)} 张帧，使用 {args.workers} 线程并发分析")
     print(f"[INFO] base_url={args.base_url}, model={args.model}")
 
-    # 断点续传
+    identities = {f.name:cache_identity(f,args.mode,args.model,args.base_url,prompt) for f in frames}
+    # Only successful, matching image+model+prompt results are reusable.
     existing = {}
     if args.resume and Path(args.output).exists():
         existing = json.load(open(args.output, encoding="utf-8"))
+        existing = {name:r for name,r in existing.items() if name in identities and reusable_result(r,identities[name],args.mode)}
         frames = [f for f in frames if f.name not in existing]
         print(f"[INFO] 断点续传: 已完成 {len(existing)} 帧，剩余 {len(frames)} 帧")
 
@@ -303,6 +326,7 @@ def main():
             frame = future_to_frame[future]
             try:
                 frame_name, result = future.result()
+                result["_cache_key"] = identities[frame_name]
                 results[frame_name] = result
                 completed += 1
                 status = "✓" if not result["error"] else "✗"
@@ -315,6 +339,8 @@ def main():
                     "complete": False, "raw": "", "error": str(e),
                     "attempts": 0, "timestamp": datetime.now().isoformat()
                 }
+
+            save_results(args.output, results)
 
     elapsed = time.time() - start_time
     success = sum(1 for r in results.values() if not r["error"])

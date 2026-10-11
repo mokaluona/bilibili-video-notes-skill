@@ -29,6 +29,9 @@ import sys
 import re
 import json
 import argparse
+from pathlib import Path
+from io import BytesIO
+from PIL import Image
 
 sys.path = [p for p in sys.path if 'hermes' not in p]
 
@@ -86,6 +89,9 @@ def add_heading_styled(doc, text, level, size):
         style = doc.styles.add_style(style_name, 1)
     p = doc.add_paragraph()
     p.style = style
+    p.paragraph_format.keep_with_next = True
+    p.paragraph_format.keep_together = True
+    style.font.color.rgb = RGBColor(0, 0, 0)
     p.paragraph_format.space_before = Pt(8 if level == 1 else 6 if level == 2 else 4)
     p.paragraph_format.space_after = Pt(4 if level == 1 else 2)
     p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.MULTIPLE
@@ -137,40 +143,29 @@ def add_table(doc, headers, rows):
     return table
 
 
+def resolve_frame(frames_dir, frame_id):
+    name = str(frame_id)
+    if not name.endswith('.jpg'):
+        name = (name if name.startswith('frame_') else 'frame_' + name) + '.jpg'
+    root = Path(frames_dir).resolve(); path = (root/name).resolve()
+    if path.parent != root or not path.is_file():
+        raise ValueError(f'Missing or invalid frame: {name}')
+    return path
+
 def add_img(doc, frame_id, caption, img_width, frames_dir):
-    path = os.path.join(frames_dir, f'frame_{frame_id}.jpg')
-    if not os.path.exists(path):
-        print(f"[WARN] 图片不存在: {path}")
-        p = doc.add_paragraph()
-        p.paragraph_format.space_before = Pt(2)
-        p.paragraph_format.space_after = Pt(1)
-        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        set_run_font(p.add_run(f'[图片缺失: frame_{frame_id}.jpg]'), size=11, red=True)
-        cap = doc.add_paragraph()
-        cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        cap.paragraph_format.space_after = Pt(2)
-        set_run_font(cap.add_run(f'图：{caption}'), size=11)
-        return p
+    path = resolve_frame(frames_dir, frame_id)
+    # Normalize ffmpeg JPEG headers before python-docx reads the stream.
+    data = BytesIO()
+    with Image.open(path) as image:
+        image.convert('RGB').save(data,format='JPEG',quality=95)
+    data.seek(0)
     p = doc.add_paragraph()
-    p.paragraph_format.space_before = Pt(2)
-    p.paragraph_format.space_after = Pt(1)
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p.add_run().add_picture(path, width=img_width)
+    p.paragraph_format.keep_with_next = True
+    p.add_run().add_picture(data,width=img_width)
     cap = doc.add_paragraph()
     cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    cap.paragraph_format.space_after = Pt(2)
-    set_run_font(cap.add_run(f'图：{caption}'), size=11)
-    return p
-    path = os.path.join(frames_dir, f'frame_{frame_id}.jpg')
-    p = doc.add_paragraph()
-    p.paragraph_format.space_before = Pt(2)
-    p.paragraph_format.space_after = Pt(1)
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p.add_run().add_picture(path, width=img_width)
-    cap = doc.add_paragraph()
-    cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    cap.paragraph_format.space_after = Pt(2)
-    set_run_font(cap.add_run(f'图：{caption}'), size=11)
+    set_run_font(cap.add_run(f'图：{caption}'),size=11)
     return p
 
 
@@ -184,12 +179,14 @@ def add_formula(doc, text):
 
 
 def add_why(doc, text):
-    add_body(doc, 'WHY 解释：', bold=True, red=True, size=RED_SIZE)
+    label = add_body(doc, 'WHY 解释：', bold=True, red=True, size=RED_SIZE)
+    label.paragraph_format.keep_with_next = True
     add_body(doc, text)
 
 
 def add_tips(doc, text):
-    add_body(doc, '做题要点', bold=True, red=True, size=RED_SIZE)
+    label = add_body(doc, '做题要点', bold=True, red=True, size=RED_SIZE)
+    label.paragraph_format.keep_with_next = True
     add_bullet(doc, [(text, False, False)])
 
 
@@ -223,11 +220,26 @@ def build_docx(config):
     else:
         add_heading_styled(doc, title, 1, H1_SIZE + 3)
 
+    # Keep the document title independent of the heading hierarchy.
+    title_paragraph = doc.paragraphs[0]
+    title_paragraph.style = doc.styles['Title']
+    title_paragraph.style.font.color.rgb = RGBColor(0, 0, 0)
+    for run in title_paragraph.runs:
+        run.font.color.rgb = RGBColor(0, 0, 0)
+    # Word's default styles may carry a decorative paragraph border.
+    for paragraph_style in doc.styles:
+        for border in paragraph_style.element.xpath('.//w:pBdr'):
+            border.getparent().remove(border)
+    for paragraph in doc.paragraphs:
+        for border in paragraph._p.xpath('.//w:pBdr'):
+            border.getparent().remove(border)
+
     # 来源
     t2 = doc.add_paragraph()
     t2.alignment = WD_ALIGN_PARAGRAPH.CENTER
     t2.paragraph_format.space_after = Pt(4)
-    set_run_font(t2.add_run(f'来源：{source}'), size=11)
+    source_label = source if source.lstrip().startswith(('来源：', '来源:')) else f'来源：{source}'
+    set_run_font(t2.add_run(source_label), size=11)
     doc.add_paragraph()
 
     # 内容区
@@ -283,11 +295,24 @@ def build_docx(config):
 def main():
     parser = argparse.ArgumentParser(description='DOCX 笔记动态生成器')
     parser.add_argument('--config', '-c', required=True, help='JSON 配置文件路径')
+    parser.add_argument('--sample-output', help='生成两张截图和首张表格的样本文档；不覆盖正式输出')
     args = parser.parse_args()
 
     with open(args.config, 'r', encoding='utf-8') as f:
         config = json.load(f)
 
+    # Validate every referenced image before writing any document.
+    for item in config.get('SECTIONS',[]):
+        if item[0] == 'img':
+            with Image.open(resolve_frame(config['FRAMES_DIR'],item[1])) as image:
+                image.load()
+    if args.sample_output:
+        chosen=[]; counts={'img':0,'table':0}
+        for item in config.get('SECTIONS',[]):
+            kind=item[0]
+            if kind in counts and counts[kind] < (2 if kind=='img' else 1):
+                chosen.append(item);counts[kind]+=1
+        config={**config,'OUTPUT_PATH':args.sample_output,'SECTIONS':[['h1','样本排版检查'],['body','检查字体、表格、截图与图注后，再生成全文。']]+chosen}
     build_docx(config)
 
 

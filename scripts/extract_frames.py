@@ -29,6 +29,8 @@ import shutil
 import subprocess
 import sys
 import glob
+import tempfile
+import hashlib
 from pathlib import Path
 
 
@@ -214,7 +216,31 @@ def download_subtitles(bvid: str, page: int, start: float = None, end: float = N
     return txt_path
 
 
-def download_video(bvid: str, page: int, start: str = None, end: str = None) -> str:
+def preflight_video(url, cookie_file, min_width=960):
+    """Inspect formats without downloading; only return safe format metadata."""
+    proc = subprocess.run([*YTDLP, '--cookies', cookie_file, '--skip-download',
+        '--dump-single-json', '--no-warnings', '--socket-timeout', '20', url],
+        capture_output=True, text=True, encoding='utf-8', timeout=90)
+    if proc.returncode:
+        raise RuntimeError('Video preflight failed; check authorized cookies/network before retrying.')
+    metadata = json.loads(proc.stdout)
+    available = [f for f in metadata.get('formats', [])
+                 if f.get('vcodec') not in (None, 'none') and (f.get('height') or 0) <= 720]
+    usable = [f for f in available if (f.get('width') or 0) >= min_width]
+    if not usable:
+        raise RuntimeError('No format meets minimum width; refresh authorized cookies or explicitly use --min-width 0.')
+    avc = [f for f in usable if str(f.get('vcodec', '')).startswith(('avc', 'h264'))]
+    chosen = max(avc or usable, key=lambda f: (f.get('width') or 0, f.get('height') or 0, f.get('tbr') or 0))
+    return {k: chosen.get(k) for k in ('format_id', 'width', 'height', 'vcodec')}
+
+def frame_cache_key(video_path, args):
+    stat = Path(video_path).stat()
+    data = [str(Path(video_path).resolve()), stat.st_size, stat.st_mtime_ns,
+            args.mode, args.interval, args.threshold, args.merge_gap, args.backup_interval]
+    return hashlib.sha256(json.dumps(data).encode()).hexdigest()
+
+
+def download_video(bvid: str, page: int, start: str = None, end: str = None, min_width: int = 960) -> str:
     """Download video with yt-dlp, optionally trimming to a time range."""
     info = get_video_info(bvid)
     cid = info["pages"][page - 1]["cid"]
@@ -236,28 +262,20 @@ def download_video(bvid: str, page: int, start: str = None, end: str = None) -> 
         return output_path
 
     url = f"https://www.bilibili.com/video/{bvid}?p={page}"
-    cmd = [
-        *YTDLP,
-        "--cookies", COOKIE_FILE,
-        "-f", "bestvideo[height<=720]+bestaudio/best[height<=720]",
-        "-o", output_path,
-    ]
-
-    if start or end:
-        # yt-dlp --download-sections for time range trimming
-        section = "*"
-        if start:
-            section += start
-        section += "-"
-        if end:
-            section += end
-        cmd.extend(["--download-sections", section])
-
-    cmd.append(url)
-
-    print(f"[download] {title}")
-    print(f"[download] {' '.join(cmd)}")
-    subprocess.run(cmd, check=True)
+    # yt-dlp rewrites its cookie jar on exit; use a private disposable copy.
+    with tempfile.TemporaryDirectory(prefix='bili-cookie-') as cookie_temp:
+        session_cookie = os.path.join(cookie_temp, 'cookies.txt')
+        shutil.copyfile(COOKIE_FILE, session_cookie)
+        chosen = preflight_video(url, session_cookie, min_width)
+        print(f"[preflight] {chosen['width']}x{chosen['height']} codec={chosen['vcodec']}")
+        cmd = [*YTDLP, '--cookies', session_cookie, '--socket-timeout', '20',
+               '--retries', '2', '--no-progress', '--ffmpeg-location', FFMPEG,
+               '-f', str(chosen['format_id']), '-o', output_path]
+        if start or end:
+            cmd.extend(['--download-sections', f"*{start or '0'}-{end or 'inf'}"])
+        cmd.append(url)
+        print(f"[download] {title}")
+        subprocess.run(cmd, check=True)
 
     # 打印实际分辨率
     try:
@@ -440,6 +458,8 @@ def main():
                         help="工作区目录（默认从环境变量 BILI_NOTES_WORKSPACE 获取）")
     parser.add_argument("--frames", default=os.environ.get("BILI_NOTES_FRAMES", FRAMES_DIR),
                         help="帧输出目录（默认从环境变量 BILI_NOTES_FRAMES 获取）")
+    parser.add_argument('--min-width', type=int, default=960, help='下载预检最低宽度；0 表示明确接受低清')
+    parser.add_argument('--force-frames', action='store_true', help='忽略已完成抽帧缓存')
     args = parser.parse_args()
 
     # 运行时覆盖全局路径
@@ -471,8 +491,17 @@ def main():
             sys.exit(1)
         print(f"[skip] Using existing: {video_path}")
     else:
-        video_path = download_video(args.bvid, args.page, args.start, args.end)
+        video_path = download_video(args.bvid, args.page, args.start, args.end, args.min_width)
 
+    # A completed cache is reusable only with matching input and parameters.
+    cache_path = Path(FRAMES_DIR) / 'frames_manifest.json'
+    cache_key = frame_cache_key(video_path, args)
+    if not args.force_frames and cache_path.exists():
+        cache = json.loads(cache_path.read_text(encoding='utf-8'))
+        files = cache.get('files', [])
+        if cache.get('key') == cache_key and files and all((Path(FRAMES_DIR)/f).is_file() and (Path(FRAMES_DIR)/f).stat().st_size for f in files):
+            print('[skip] Matching completed frame cache')
+            return
     # Step 3: Extract frames
     if args.mode == "cover":
         # Cover mode: fixed interval, default 10s for full coverage
@@ -484,6 +513,10 @@ def main():
     if args.mode in ("scene", "both"):
         extract_scene_frames(video_path, args.threshold, args.merge_gap, args.backup_interval)
 
+    folders = ['scene'] if args.mode == 'scene' else ['fixed'] if args.mode in ('fixed','cover') else ['scene','fixed']
+    files = [str(p.relative_to(FRAMES_DIR)) for folder in folders for p in (Path(FRAMES_DIR)/folder).glob('frame_*.jpg')]
+    if files:
+        cache_path.write_text(json.dumps({'key':cache_key,'files':files},indent=2),encoding='utf-8')
     print("\n[done] All frames extracted successfully!")
 
 
