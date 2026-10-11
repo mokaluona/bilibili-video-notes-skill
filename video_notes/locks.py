@@ -1,9 +1,28 @@
 """Shared cross-process quotas. Stale locks are diagnosed, never stolen."""
 import os
 import time
+import threading
+from functools import wraps
 from contextlib import contextmanager
 from pathlib import Path
 from .storage import write, now
+_LOCAL = threading.local()
+
+def guarded(function):
+    """Reentrant for this thread, exclusive against other processes/threads."""
+    @wraps(function)
+    def call(run, *args, **kwargs):
+        root = str(Path(run['workspace']).resolve())
+        held = getattr(_LOCAL, 'held', set())
+        if root in held:
+            return function(run, *args, **kwargs)
+        with quota(Path(root) / '.locks', 'mutation', timeout=run.get('run_lock_timeout', 0)):
+            _LOCAL.held = held | {root}
+            try:
+                return function(run, *args, **kwargs)
+            finally:
+                _LOCAL.held = held
+    return call
 
 @contextmanager
 def quota(root, resource, slots=1, timeout=120):

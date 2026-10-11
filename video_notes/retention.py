@@ -2,15 +2,21 @@
 import subprocess
 from pathlib import Path
 from .storage import read, write, digest
+from .path_safety import plain_path
+from .locks import guarded
 
 def plan(run):
     delivered = read(Path(run['workspace']) / 'delivery-result.json')
     if delivered['run_id'] != run['run_id'] or delivered['status'] != 'delivered':
         raise ValueError('Successful delivery required')
+    if delivered.get('marker'):
+        marker = read(delivered['marker'])
+        if marker.get('status') != 'delivered' or marker.get('attempt_id') != delivered['attempt_id']:
+            raise ValueError('Delivery completion marker missing or changed')
     for item in delivered['files']:
         if digest(item['target']) != item['sha256']:
             raise ValueError('Delivery missing or changed')
-    roots = [Path(run[x]).resolve() for x in ('workspace', 'frames')]
+    roots = [plain_path(Path(run[x]).absolute(), Path(run[x]).absolute()) for x in ('workspace', 'frames')]
     targets = []
     manifest = read(Path(run['workspace']) / 'asset-manifest.json')
     for item in manifest['assets']:
@@ -18,7 +24,11 @@ def plan(run):
             continue
         if item['run_id'] != run['run_id']:
             raise ValueError('Foreign asset')
-        path = Path(item['path']).resolve()
+        raw = Path(item['path']).absolute()
+        matching = [root for root in roots if raw.is_relative_to(root)]
+        if not matching:
+            raise ValueError('Cleanup asset outside run roots')
+        path = plain_path(raw, matching[0])
         if not any(path.is_relative_to(root) and path != root for root in roots) or path.is_symlink() or not path.is_file():
             raise ValueError('Invalid cleanup target')
         from .assets import is_credential
@@ -30,6 +40,7 @@ def plan(run):
     write(Path(run['workspace']) / 'cleanup-plan.json', targets)
     return targets
 
+@guarded
 def execute(run):
     path = Path(run['workspace']) / 'cleanup-plan.json'
     previous = read(path)

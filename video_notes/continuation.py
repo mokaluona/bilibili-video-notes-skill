@@ -57,6 +57,10 @@ def continue_until(run, boundary='final'):
         return {'run_id': run['run_id'], 'status': 'succeeded', 'boundary': boundary, 'quality': quality}
     delivered_path = Path(run['workspace']) / 'delivery-result.json'
     if not delivered_path.exists():
+        attempt = Path(run['workspace']) / 'delivery-attempt.json'
+        if attempt.exists():
+            return {'run_id': run['run_id'], 'status': 'needs_attention', 'kind': 'incomplete_delivery',
+                    'next': 'Inspect delivery-attempt.json and the marker path from the plan. Use deliver --recover only when a matching publication claim exists; otherwise re-run deliver. Do not treat partial files as completed output'}
         proposed = plan(run)
         if not policy_reviewed(run, proposed):
             return {'run_id': run['run_id'], 'status': 'awaiting_review', 'kind': 'delivery_policy', 'plan': proposed}

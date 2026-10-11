@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from .storage import read, write, now, digest
-from .locks import quota
+from .locks import quota, guarded
 from .reviews import confirmed
 
 def execute(run, name, args):
@@ -33,6 +33,7 @@ def execute(run, name, args):
         record["log_path"] = str(log)
         write(workspace / f"{name}-state.json", record)
 
+@guarded
 def run_until(run, boundary="candidates"):
     from .config import require
     require(run, boundary)

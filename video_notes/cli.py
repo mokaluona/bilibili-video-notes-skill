@@ -29,6 +29,8 @@ def main():
             p.add_argument('--sample', action='store_true')
         if name == 'cleanup':
             p.add_argument('--execute', action='store_true')
+        if name == 'deliver':
+            p.add_argument('--recover', action='store_true')
         if name == "review-import":
             p.add_argument("--input", required=True)
     for name in ('contacts', 'select', 'supplement', 'excerpt', 'freeze-topics'):
@@ -71,12 +73,13 @@ def main():
             from .topics import freeze
             actions = {'review-request': lambda: request(run, args.kind), 'review-import': lambda: import_result(run, args.kind, args.input),
                        'validate': lambda: report(run), 'build-run': lambda: build_run(run, args.sample), 'render': lambda: render(run, args.sample),
-                       'diagnose': lambda: diagnostic(run), 'delivery-plan': lambda: plan(run), 'deliver': lambda: deliver(run),
+                       'diagnose': lambda: diagnostic(run), 'delivery-plan': lambda: plan(run), 'deliver': lambda: deliver(run, args.recover),
                        'cleanup': lambda: cleanup_execute(run) if args.execute else cleanup_plan(run)}
             actions.update({'contacts': lambda: contacts(run), 'select': lambda: select(run, args.input),
                             'supplement': lambda: supplement(run, args.seconds), 'excerpt': lambda: excerpt(run, args.start, args.end),
                             'freeze-topics': lambda: freeze(run)})
-            result = actions[args.command]()
+            from .locks import guarded
+            result = actions[args.command]() if args.command == 'excerpt' else guarded(lambda active_run: actions[args.command]())(run)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         if isinstance(result, list) and any(x.get("status") == "failed" for x in result):
             raise SystemExit(1)
