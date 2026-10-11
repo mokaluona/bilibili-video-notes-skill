@@ -39,7 +39,7 @@ git clone https://github.com/mokaluona/bilibili-video-notes-skill.git
 cd bilibili-video-notes-skill
 pip install -r scripts/requirements.txt
 
-安装完成后，配置 .env 和 bilibili_cookies.txt，然后读取 README.md 了解如何使用。
+安装完成后，配置 bilibili_cookies.txt（要改用外部视觉 API 时再配 .env），然后读取 README.md 了解如何使用。
 ```
 
 ---
@@ -601,7 +601,6 @@ bilibili-video-notes/
 │   ├── gen_docx_dynamic.py
 │   ├── docx_note_v2.py
 │   ├── config_example.json
-│   ├── env.example             # 旧路径模板，保留兼容；新配置请用根目录 .env.example
 │   └── checklist.json
 ├── video_notes/                # 模块化笔记工具包（实验性，见下）
 └── tests/                      # video_notes 的 unittest 测试套件
@@ -639,7 +638,8 @@ GPT / Codex、Kimi 直接用当前会话的多模态能力完成选帧、文字�
 
 新增 `video_notes/` 包和 `tests/` 测试套件，把流程拆成可校验的阶段：
 
-- **阶段机**：`preflight → acquire → 去重 → 候选 → 视觉审核 → 正文 → 内容审核 → 样本/生成 → 渲染 → 页面审核 → 校验 → 交付 → 清理`
+- **阶段机**：`预检 → 获取/去重 → 候选 → 视觉审核 → 内容审核 → 样本构建与渲染 → 样本页审核 → 全文构建与渲染 → 页面审核 → 诊断 → 质量报告 → 交付策略审核 → 交付 → 清理`
+  （每步在**真实审核点**停下等人工/Agent 回填结果，自动阶段不代签审核）
 - **审核留痕**：审核记录带 `reviewer {kind, id, independence}`，按内容哈希拒绝过期结果；
   Agent 不能自称"独立审核"
 - **质量报告**：逐项检查正文契约、来源冻结、当前构建/渲染、四类审核、逐字匹配、档位支持，输出
@@ -666,7 +666,7 @@ GPT / Codex、Kimi 直接用当前会话的多模态能力完成选帧、文字�
 
 - `scripts/recommend_frames.py` — 按打分自动推荐 Top 10 并复制到 `final/`
 - `scripts/generate_config_draft.py` — 从提取结果 + 字幕自动生成 DOCX 配置骨架
-- `scripts/quick_dedup.py` — 快速去重
+- `scripts/quick_dedup.py` — 仅感知哈希去重、跳过 OCR（`smart_select.py` 的提速版，口播类视频用）
 - `templates/gen_docx_dynamic.py` + `templates/config_example.json` — 数据驱动的 DOCX 生成器
 
 ### 7. 抽帧默认改 `scene + 30s 保底`
@@ -686,7 +686,15 @@ GPT / Codex、Kimi 直接用当前会话的多模态能力完成选帧、文字�
 
 ### 10. 修掉会让流程静默失效的脚本缺陷
 
-上游有四处导致流程安静出错（无报错但结果不对）的缺陷，已修。
+上游有四处**无报错但结果不对**的缺陷，已修：
+
+- `score_frames_concurrent.py` — 模型返回的字段平铺到顶层。原先只锁在 raw 字符串里，而下游
+  `generate_config_draft` 读顶层，于是骨架只剩标题和图片
+- `generate_config_draft.py` — 中文主题与字幕句的重叠改用字符二元组（中文无空格，按词切分恒为空集）；
+  `concepts` 缺失时退回整页文字；新增 `--docx-path` 指定交付落点
+- `extract_frames.py` — 外部命令按「模块 → 环境变量 → PATH」解析（pip 把 yt-dlp 装进 venv 时
+  Scripts 不在 PATH，原先必然 `FileNotFoundError`）；cookie 按 utf-8 读，避免非 ASCII 字节触发 GBK 解码失败
+- `verify_docx.py` — 表格检查从硬门降为提示（原先一 FAIL 就 `return`，把后面的字幕覆盖率检查整个挡掉）
 
 ---
 
