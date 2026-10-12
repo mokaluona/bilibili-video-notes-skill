@@ -39,6 +39,26 @@ from docx import Document
 from docx.shared import Inches, Pt, RGBColor, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.oxml.ns import qn
+# Package imports and direct/importlib execution share a loader without changing sys.path.
+if __package__:
+    from .formula_layout import add_text as _add_formula_text
+else:
+    import importlib.util as _formula_util
+    from pathlib import Path as _FormulaPath
+    _formula_name = '_bili_formula_layout'
+    if _formula_name not in sys.modules:
+        _formula_root = _FormulaPath(__file__).resolve().parent / 'formula_layout'
+        _formula_spec = _formula_util.spec_from_file_location(
+            _formula_name, _formula_root / '__init__.py',
+            submodule_search_locations=[str(_formula_root)])
+        _formula_module = _formula_util.module_from_spec(_formula_spec)
+        sys.modules[_formula_name] = _formula_module
+        try:
+            _formula_spec.loader.exec_module(_formula_module)
+        except Exception:
+            sys.modules.pop(_formula_name, None)
+            raise
+    _add_formula_text = sys.modules[_formula_name].add_text
 
 # =============================================================================
 # === 默认样式常量 ===
@@ -66,13 +86,8 @@ def set_run_font(run, name='宋体', size=BODY_SIZE, bold=False, red=False):
 
 
 def _add_runs_with_sub(p, text, name='宋体', size=BODY_SIZE, bold=False, red=False):
-    """添加文本 run，自动处理 _X 下标。"""
-    parts = re.split(r'_([a-zA-Z0-9]+)', text)
-    for i, part in enumerate(parts):
-        run = p.add_run(part)
-        set_run_font(run, name=name, size=size, bold=bold, red=red)
-        if i % 2 == 1:
-            run.font.subscript = True
+    """统一排版正文、上下标与补事件横线；数学结构使用 Word OMML。"""
+    _add_formula_text(p, text, name=name, size=size, bold=bold, red=red)
 
 
 def setup_section(doc):
@@ -133,12 +148,12 @@ def add_table(doc, headers, rows):
     for i, h in enumerate(headers):
         p = table.rows[0].cells[i].paragraphs[0]
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        set_run_font(p.add_run(h), name='黑体', size=BODY_SIZE, bold=True)
+        _add_runs_with_sub(p, h, name='黑体', size=BODY_SIZE, bold=True)
     for r_idx, row in enumerate(rows):
         for c_idx, cell_text in enumerate(row):
             p = table.rows[r_idx + 1].cells[c_idx].paragraphs[0]
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            set_run_font(p.add_run(cell_text), size=BODY_SIZE - 1)
+            _add_runs_with_sub(p, cell_text, size=BODY_SIZE - 1)
     doc.add_paragraph()
     return table
 
@@ -174,7 +189,7 @@ def add_formula(doc, text):
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p.paragraph_format.space_before = Pt(4)
     p.paragraph_format.space_after = Pt(4)
-    set_run_font(p.add_run(text), name='Times New Roman', size=FORMULA_SIZE, bold=True, red=True)
+    _add_runs_with_sub(p, text, name='Cambria Math', size=FORMULA_SIZE, bold=True, red=True)
     return p
 
 

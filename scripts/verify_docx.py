@@ -204,7 +204,15 @@ def verify(docx_path: str, keywords: list, min_images: int = 1,
         print(f"[FAIL] {docx_path} is not a valid docx (zip)")
         return False
 
-    docx_text = '\n'.join(node.text or '' for node in ET.fromstring(xml).iter('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t'))
+    tree = ET.fromstring(xml)
+    w = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
+    m = '{http://schemas.openxmlformats.org/officeDocument/2006/math}'
+    # Join runs within each paragraph so split notation cannot evade the gate.
+    paragraphs = [''.join(n.text or '' for n in p.iter() if n.tag in (w+'t', m+'t')) for p in tree.iter(w+'p')]
+    docx_text = '\n'.join(paragraphs)
+    if re.search(r'\^\s*(?:[cC]|\{\s*[cC]\s*\})', docx_text):
+        print('[FAIL] Unrendered complement notation; use the shared formula layout layer.')
+        return False
     if coverage_map and not check_coverage_map(docx_text,coverage_map):
         return False
     print(f"[2] embedded images: {len(media)} (expect >= {min_images})")
