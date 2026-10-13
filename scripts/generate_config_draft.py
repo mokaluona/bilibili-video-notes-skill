@@ -248,7 +248,10 @@ def build_document(frames_data, title, source=""):
         data = load_frame_payload(raw)
         if data.get('error'):
             raise ValueError(f"{frame_id}: unresolved visual extraction: {data['error']}")
-        formulas = normalize_formulas(data.get('formulas', []))
+        try:
+            formulas = normalize_formulas(data.get('formulas', []), allow_legacy=False)
+        except ValueError as exc:
+            raise ValueError(f'{frame_id}: {exc}') from exc
         anchors = []
         for field, kind in [('concepts', 'paragraph'), ('reasoning', 'explanation'), ('tables', 'table')]:
             values = data.get(field) or []
@@ -290,7 +293,9 @@ def build_document(frames_data, title, source=""):
                     emit(block, {'field':field, 'index':index})
                 for i, formula in enumerate(formulas):
                     if formula['placement'] == {'field':field, 'index':index, 'position':position}:
-                        emit(formula, {'field':'formulas', 'index':i})
+                        # placement is extraction-only; final provenance is supplied by the host.
+                        emit({key:formula[key] for key in ('type', 'format', 'text')},
+                             {'field':'formulas', 'index':i})
         asset_id = prefix + '-image'
         assets[asset_id] = frame_id
         emit({'type':'image', 'asset_id':asset_id, 'caption':data.get('theme') or frame_id}, {'field':'image'})

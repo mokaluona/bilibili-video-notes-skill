@@ -90,10 +90,65 @@ class FormulaInput(unittest.TestCase):
         self.assertEqual(block['source_refs'][0]['image_sha256'], 'b'*64)
 
     def test_missing_or_invalid_anchor_is_not_inferred(self):
-        for fs in ([{'type':'formula','format':'latex','text':'x'}], [formula(index=99)], ['A^c']):
+        for fs in ([{'type':'formula','format':'latex','text':'x'}], [formula(index=99)]):
             f = self.frame(); f['formulas'] = fs
             with self.subTest(fs=fs), self.assertRaisesRegex(ValueError, 'no position inferred'):
                 draft.build_document({'frame_0001.jpg':f}, 'test')
+
+    def test_string_format_error_is_distinct_from_missing_placement(self):
+        f = self.frame(); f['formulas']=['A^c']
+        with self.assertRaisesRegex(ValueError, r'frame_0001.jpg: formulas\[0\]: Legacy string formula') as caught:
+            draft.build_document({'frame_0001.jpg':f}, 'test')
+        self.assertNotIn('placement', str(caught.exception))
+
+    def test_null_placement_is_a_located_value_error(self):
+        f = self.frame(); f['formulas']=[{**formula(), 'placement':None}]
+        with self.assertRaisesRegex(ValueError, r'formulas\[0\]: placement requires'):
+            normalize_formulas(f['formulas'])
+        with self.assertRaisesRegex(ValueError, r'frame_0001.jpg: formulas\[0\]: placement requires'):
+            draft.build_document({'frame_0001.jpg':f}, 'test')
+
+    def test_whitelist_and_host_provenance_at_final_boundary(self):
+        value={**formula(), 'id':'invented', 'red':True, 'verified':True, 'provider_payload':{},
+               'source_refs':[{'frame_id':'invented.jpg', 'verified':True, 'confidence':1}]}
+        normalized=normalize_formulas([value])[0]
+        self.assertEqual(set(normalized), {'type','format','text','placement','source_refs'})
+        self.assertEqual(normalized['source_refs'], [{'frame_id':'invented.jpg'}])
+        f=self.frame(); f.update(formulas=[value], recognition_source='agent_native', image_sha256='c'*64)
+        block=next(b for b in draft.build_document({'frame_0001.jpg':f}, 'test')['blocks'] if b['type']=='formula')
+        self.assertEqual(set(block), {'id','type','format','text','source_refs'})
+        self.assertEqual(block['source_refs'][0], {'frame_id':'frame_0001.jpg','field':'formulas','index':0,
+                         'recognition_source':'agent_native','image_sha256':'c'*64})
+
+    def test_lightweight_groups_do_not_reapply_legacy_semantics(self):
+        for text in (r'\frac{a}{', r'\overline{A', 'A}', r'\int_{0}^{1}{x', 'x^', 'x'+chr(92), 'x% comment'):
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                normalize_formulas([formula(text)])
+        for text in ('x^2y', 'A^cost', 'A^{c}', r'\frac{a}{b}', r'\{x\}',
+                     r'\left\{x\right.', r'x\%', r'x\_', r'\begin{cases}x&x>0\\0&x<0\end{cases}'):
+            with self.subTest(text=text):
+                self.assertEqual(normalize_formulas([formula(text)])[0]['text'], text)
+
+    def test_cli_fail_fast_cases_do_not_publish_output(self):
+        cases=[(['A^c'],'Legacy string formula'),
+               ([{'type':'formula','format':'latex','text':'x'}],'explicit placement'),
+               ([{**formula(),'placement':None}],'placement requires'),
+               ([formula(r'\frac{a}{')],'Unclosed LaTeX group')]
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); vision=root/'vision.json'; output=root/'document.json'
+            cmd=[sys.executable,str(ROOT/'scripts/generate_config_draft.py'),'--vision',str(vision),
+                 '--title','test','--source','synthetic','--frames-dir',tmp,'--output',str(output),
+                 '--output-format','document']
+            for formulas,message in cases:
+                f=self.frame(); f['formulas']=formulas
+                vision.write_text(json.dumps({'frame_0001.jpg':f}),encoding='utf-8')
+                result=subprocess.run(cmd,capture_output=True,text=True,encoding='utf-8',
+                                      env={**os.environ,'PYTHONIOENCODING':'utf-8'})
+                with self.subTest(message=message):
+                    self.assertNotEqual(result.returncode,0)
+                    self.assertIn(message,result.stderr)
+                    self.assertNotIn('TypeError',result.stderr)
+                    self.assertFalse(output.exists())
 
     def test_new_document_preserves_input_frame_order_not_score_order(self):
         a, b = self.frame(), self.frame(); a['theme']='first frame'; b['theme']='second frame'
