@@ -30,6 +30,11 @@ import json
 import os
 import re
 from difflib import SequenceMatcher
+from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from video_notes.formula_input import normalize_formulas
+from video_notes.domain import validate_document
 
 
 def text_similarity(a: str, b: str) -> float:
@@ -235,8 +240,69 @@ def build_summary(sections: list) -> list:
     return summary[:5]  # 最多 5 条
 
 
+
+def build_document(frames_data, title, source=""):
+    """Preserve supplied frame order and explicit formula anchors, never infer chronology."""
+    blocks, assets = [], {}
+    for frame_index, (frame_id, raw) in enumerate(frames_data.items()):
+        data = load_frame_payload(raw)
+        if data.get('error'):
+            raise ValueError(f"{frame_id}: unresolved visual extraction: {data['error']}")
+        formulas = normalize_formulas(data.get('formulas', []))
+        anchors = []
+        for field, kind in [('concepts', 'paragraph'), ('reasoning', 'explanation'), ('tables', 'table')]:
+            values = data.get(field) or []
+            if field == 'reasoning':
+                values = [] if values == 'None' or not values else [values]
+            if not isinstance(values, list):
+                raise ValueError(f"{frame_id}: {field} must be an array")
+            for index, value in enumerate(values):
+                block = {'type': kind}
+                if kind == 'table':
+                    block.update(headers=value['headers'], rows=value['rows'])
+                else:
+                    block['text'] = value
+                anchors.append((field, index, block))
+        if data.get('text'):
+            anchors.append(('text', 0, {'type': 'paragraph', 'text': data['text']}))
+        keys = {(field, index) for field, index, _ in anchors}
+        for i, formula in enumerate(formulas):
+            placement = formula.get('placement')
+            if not placement or (placement['field'], placement['index']) not in keys:
+                raise ValueError(f"{frame_id}: formulas[{i}] needs an explicit placement referencing existing content; no position inferred")
+        prefix = f"frame-{frame_index + 1}"
+        def emit(block, locator):
+            block = dict(block)
+            block['id'] = f"{prefix}-{len(blocks) + 1}"
+            ref = {'frame_id': frame_id, **locator}
+            for key in ('recognition_source', 'image_sha256', 'agent'):
+                if key in data:
+                    ref[key] = data[key]
+            # review-import records use sha256; flat extraction artifacts use image_sha256.
+            if 'image_sha256' not in ref and data.get('sha256'):
+                ref['image_sha256'] = data['sha256']
+            block['source_refs'] = [ref]
+            blocks.append(block)
+        emit({'type':'heading', 'text':data.get('theme') or frame_id, 'level':1}, {'field':'theme'})
+        for field, index, block in anchors:
+            for position in ('before', 'after'):
+                if position == 'after':
+                    emit(block, {'field':field, 'index':index})
+                for i, formula in enumerate(formulas):
+                    if formula['placement'] == {'field':field, 'index':index, 'position':position}:
+                        emit(formula, {'field':'formulas', 'index':i})
+        asset_id = prefix + '-image'
+        assets[asset_id] = frame_id
+        emit({'type':'image', 'asset_id':asset_id, 'caption':data.get('theme') or frame_id}, {'field':'image'})
+    return validate_document({'schema_version':1, 'metadata':{'title':title, 'source':source,
+        'ordering':'input frame order; explicit formula anchors; chronology and semantics require human review'},
+        'blocks':blocks, 'assets':assets})
+
+
 def main():
     parser = argparse.ArgumentParser(description='DOCX JSON 配置骨架生成器')
+    parser.add_argument("--output-format", choices=("legacy", "document"), default="legacy",
+                        help="document preserves explicitly placed formula blocks; legacy stays compatible")
     parser.add_argument('--vision', '-v', required=True, help='vision_extract.json 路径')
     parser.add_argument('--key-sentences', '-k', default=None, help='字幕关键句 JSON 路径（可选）')
     parser.add_argument('--title', '-t', required=True, help='文档标题')
@@ -262,6 +328,15 @@ def main():
         key_sentences = ks_data.get('key_sentences', [])
         print(f"[INFO] 加载 {len(key_sentences)} 条字幕关键句")
     
+    if args.output_format == "document":
+        document = build_document(vision_data, args.title, args.source)
+        with open(args.output, 'w', encoding='utf-8') as f:
+            json.dump(document, f, ensure_ascii=False, indent=2)
+        print("[INFO] 文档骨架已保存；帧顺序沿用输入，不代表已验证的讲授顺序；公式须人工验收。")
+        return
+
+    if any(load_frame_payload(v).get('formulas') for v in vision_data.values()):
+        print("[WARNING] legacy 骨架沿用旧行为，不传递 formulas；结构化公式请用 --output-format document。")
     # 聚类
     groups = cluster_frames(vision_data, similarity_threshold=args.similarity)
     print(f"[INFO] 聚类为 {len(groups)} 个主题组")

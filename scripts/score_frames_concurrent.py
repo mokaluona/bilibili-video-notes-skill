@@ -60,6 +60,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 import requests
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from video_notes.formula_input import normalize_formulas
 
 # 尝试加载 skill 目录下的 .env 文件
 try:
@@ -100,7 +102,7 @@ Answer strictly in the following JSON format, with no extra content:
   "score": 8,
   "complete": true,
   "text": "All readable text in the image, transcribed faithfully. If the image contains explanatory text, preserve the full causal chain (why / because / if...then / threshold / cost / overhead / retransmission, etc.).",
-  "formulas": ["formula1", "formula2"],
+  "formulas": [{"type":"formula", "format":"latex", "text":"x^{2}", "placement":{"field":"concepts", "index":0, "position":"after"}}],
   "tables": [
     {
       "caption": "table caption if any",
@@ -118,6 +120,8 @@ Answer strictly in the following JSON format, with no extra content:
 'complete' means the screenshot is fully visible, not cropped or blocked.
 If there are no formulas or tables, use empty arrays [] for those fields.""".strip()
 
+
+EXTRACT_PROMPT += "\n" + (Path(__file__).resolve().parents[1] / "prompts" / "math_notation.md").read_text(encoding="utf-8")
 
 def encode_image(path: Path) -> str:
     """将图片转为 base64 data URL。"""
@@ -199,6 +203,9 @@ def process_one_frame(
             content = data["choices"][0]["message"]["content"]
             parsed = parse_json_response(content)
 
+            if prompt == EXTRACT_PROMPT:
+                parsed['formulas'] = normalize_formulas(parsed.get('formulas', []), allow_legacy=False)
+
             # 模型返回的字段全部提到顶层：留 raw 供排查，但不要让
             # text/concepts/reasoning/tables 只活在 raw 字符串里——
             # 下游 generate_config_draft.py 读的是顶层，锁在 raw 里它就取不到。
@@ -213,6 +220,9 @@ def process_one_frame(
             }
             for key, value in parsed.items():
                 result.setdefault(key, value)
+            if prompt == EXTRACT_PROMPT:
+                result['recognition_source'] = 'external_api'
+                result['image_sha256'] = hashlib.sha256(frame_path.read_bytes()).hexdigest()
             return frame_name, result
 
         except Exception as e:

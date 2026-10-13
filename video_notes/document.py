@@ -51,6 +51,8 @@ def sample_blocks(blocks):
 
 def build(document, output, asset_root, style=None, sample=False):
     validate_document(document)
+    if any(b["type"] == "formula" and b.get("format") == "latex" for b in document["blocks"]):
+        raise ValueError("LaTeX rendering is not enabled yet; stage A only produces document data")
     style = style or StyleProfile()
     assets = document.get("assets", {})
     # Validate all image references even for a sample build.

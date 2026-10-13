@@ -10,8 +10,9 @@ def validate_document(doc):
         if block["id"] in ids or block["type"] not in BLOCKS:
             raise ValueError("Duplicate block ID or unknown block type")
         ids.add(block["id"])
-        if block["type"] == "formula" and block.get("format", "plain") != "plain":
-            raise ValueError("Only plain formulas currently supported")
+        if block["type"] == "formula":
+            from .formula_input import validate_formula
+            validate_formula(block)
         kind = block["type"]
         if kind in {"heading", "paragraph", "formula", "explanation", "tip"} and not isinstance(block.get("text"), str):
             raise ValueError("Text block requires a string")
