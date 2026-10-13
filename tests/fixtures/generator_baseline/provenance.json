@@ -1,0 +1,38 @@
+{
+  "fixture_version": 1,
+  "source_ref": "third-lecture",
+  "source_identifier_recorded": false,
+  "legacy_real_sections": [
+    {
+      "fixture_index": 3,
+      "source_section_index": 1
+    },
+    {
+      "fixture_index": 9,
+      "source_section_index": 80
+    },
+    {
+      "fixture_index": 10,
+      "source_section_index": 40
+    },
+    {
+      "fixture_index": 11,
+      "source_section_index": 77
+    }
+  ],
+  "synthetic_scope": "Remaining sections and alternate image ID exercise legacy kinds, list styles, summary and asset normalization; not course quotations. Test images generated in temp directories.",
+  "inputs": {
+    "config_final.json": "feca982ed9b293b7a541d64f4a3ece9b4bf5f578acdf5fa2f1ecdb664be8512a",
+    "rich_math.py": "173a4b2e0be920fee9a129886e9e8c96c865f81dd3c21aa5ba393b366093fadb",
+    "rich_math3.py": "fc5ed53f6c610c2894b59562f1b06161213ff3877ca842c4b764e2db297feaa9",
+    "author_probability3.py": "d77a2dffec2666595a506e07a61cb5e3f7eae7856e543c9037ef06d12fca2c4b"
+  },
+  "temporary_injector_limits": [
+    "m:e contains a zero-width placeholder, not the integrand",
+    "Only underscore-started operators create nary nodes",
+    "No subHide is emitted",
+    "Only supHide is emitted",
+    "Integral limits use Cambria Math plus m:sty=p to preserve visibility"
+  ],
+  "production_code_changed": false
+}

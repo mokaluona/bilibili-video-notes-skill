@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "metadata": {
+    "title": "多维随机变量生成基准",
+    "source": "第三讲真实节选加合成边界用例"
+  },
+  "assets": {
+    "image-12": "frame_0137.jpg",
+    "image-13": "frame_0305.jpg"
+  },
+  "blocks": [
+    {
+      "id": "legacy-1",
+      "type": "heading",
+      "text": "联合分布与条件密度",
+      "level": 1
+    },
+    {
+      "id": "legacy-2",
+      "type": "heading",
+      "text": "条件密度的切片",
+      "level": 2
+    },
+    {
+      "id": "legacy-3",
+      "type": "heading",
+      "text": "固定样本中的补充标题",
+      "level": 3
+    },
+    {
+      "id": "legacy-4",
+      "type": "paragraph",
+      "text": "本讲从一维随机变量扩展到两个变量，核心是区分联合、边缘和条件分布，并判断两个变量是否独立。掌握这些关系后，再求和、差、积、商及最大值、最小值的分布。本文沿课程顺序保留全部35道编号例题，补全计算步骤，并整理末尾的概率知识体系。"
+    },
+    {
+      "id": "legacy-5",
+      "type": "paragraph",
+      "text": "先核对支撑范围",
+      "bold": true
+    },
+    {
+      "id": "legacy-6",
+      "type": "paragraph",
+      "text": "条件事件必须有正概率",
+      "bold": true,
+      "red": true
+    },
+    {
+      "id": "legacy-7",
+      "type": "list",
+      "items": [
+        [
+          {
+            "text": "切片后归一化",
+            "bold": false,
+            "red": false
+          }
+        ],
+        [
+          {
+            "text": "核对积分上下限",
+            "bold": true,
+            "red": true
+          }
+        ]
+      ]
+    },
+    {
+      "id": "legacy-8",
+      "type": "explanation",
+      "text": "给定连续变量单点时使用条件密度。"
+    },
+    {
+      "id": "legacy-9",
+      "type": "tip",
+      "text": "不同条件不能混用。"
+    },
+    {
+      "id": "legacy-10",
+      "type": "formula",
+      "text": "P(X<1,Y<2)=∫_{0}^{1}dx∫_{x}^{2}xe^(−y)dy=1−2e^(−1)−e^(−2)/2。"
+    },
+    {
+      "id": "legacy-11",
+      "type": "table",
+      "headers": [
+        "X与Y",
+        "Y=0",
+        "Y=1",
+        "Y=2",
+        "X边缘"
+      ],
+      "rows": [
+        [
+          "X=0",
+          "1/4",
+          "1/3",
+          "1/9",
+          "25/36"
+        ],
+        [
+          "X=1",
+          "1/6",
+          "1/9",
+          "0",
+          "5/18"
+        ],
+        [
+          "X=2",
+          "1/36",
+          "0",
+          "0",
+          "1/36"
+        ],
+        [
+          "Y边缘",
+          "4/9",
+          "4/9",
+          "1/9",
+          "1"
+        ]
+      ]
+    },
+    {
+      "id": "legacy-12",
+      "type": "image",
+      "asset_id": "image-12",
+      "caption": "图 6 同一三角区域两种切片的上下限及条件密度"
+    },
+    {
+      "id": "legacy-13",
+      "type": "image",
+      "asset_id": "image-13",
+      "caption": "密度变换公式及有效支撑"
+    },
+    {
+      "id": "legacy-summary-heading",
+      "type": "heading",
+      "text": "本节要点总结",
+      "level": 1
+    },
+    {
+      "id": "legacy-summary",
+      "type": "list",
+      "items": [
+        "核对支撑、条件与归一化。"
+      ]
+    }
+  ]
+}

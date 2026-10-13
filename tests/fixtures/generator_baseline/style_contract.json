@@ -1,0 +1,27 @@
+{
+  "fixture_version": 1,
+  "baseline": "templates before step 2 patch",
+  "template": {
+    "body_size": 13,
+    "formula_size": 15,
+    "margin_cm": 1.27,
+    "line_spacing": 1.4,
+    "formula_font": "Cambria Math",
+    "formula_color": "C00000",
+    "caption_prefix": "图：",
+    "table_alignment": null,
+    "cell_alignment": "CENTER",
+    "repeat_header": false
+  },
+  "core_current": {
+    "body_size": 12,
+    "formula_size": 12,
+    "margin_cm": 1.7,
+    "line_spacing": 1.25,
+    "formula_color": "000000",
+    "caption_prefix": "图 {n} {caption}",
+    "repeat_header": true,
+    "formula_font": "宋体"
+  },
+  "next_baseline_action": "Step 2 updates repeat_header baseline and its test together after the tblHeader patch. core_current.formula_font records that core formulas render in the body font, not the template math font; core_current.caption_prefix is a format string, template.caption_prefix is a literal prefix."
+}

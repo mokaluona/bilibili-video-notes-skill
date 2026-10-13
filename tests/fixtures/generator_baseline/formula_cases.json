@@ -1,0 +1,297 @@
+{
+  "fixture_version": 1,
+  "status": "future contract; not evidence of current implementation",
+  "span_unit": "Unicode code points; half-open offsets into add_text input",
+  "cases": [
+    {
+      "id": "integral_bounded",
+      "input": "∫_{x}^{2}{x e^{-y}} dy",
+      "classification": "nary",
+      "operator": "∫",
+      "chr": "∫",
+      "limLoc": "subSup",
+      "lower": "x",
+      "upper": "2",
+      "body": "x e^{-y}",
+      "trailing": " dy",
+      "domain": "generic",
+      "expected_omml": {
+        "tag": "m:nary",
+        "subHide": false,
+        "supHide": false,
+        "body_bound_to_m_e": true
+      },
+      "step2_severity": "warning",
+      "target_notices": [],
+      "code": "UNSUPPORTED_NARY"
+    },
+    {
+      "id": "integral_unit",
+      "input": "∫_{0}^{1}{1} dy",
+      "classification": "nary",
+      "operator": "∫",
+      "chr": "∫",
+      "limLoc": "subSup",
+      "lower": "0",
+      "upper": "1",
+      "body": "1",
+      "trailing": " dy",
+      "domain": "generic",
+      "expected_omml": {
+        "tag": "m:nary",
+        "subHide": false,
+        "supHide": false,
+        "body_bound_to_m_e": true
+      },
+      "step2_severity": "warning",
+      "target_notices": [],
+      "code": "UNSUPPORTED_NARY"
+    },
+    {
+      "id": "double_region",
+      "input": "∬_{D}{f(x,y)} dx dy",
+      "classification": "nary",
+      "operator": "∬",
+      "chr": "∬",
+      "limLoc": "subSup",
+      "lower": "D",
+      "upper": null,
+      "body": "f(x,y)",
+      "trailing": " dx dy",
+      "domain": "generic",
+      "expected_omml": {
+        "tag": "m:nary",
+        "subHide": false,
+        "supHide": true,
+        "body_bound_to_m_e": true
+      },
+      "step2_severity": "warning",
+      "target_notices": [],
+      "code": "UNSUPPORTED_NARY"
+    },
+    {
+      "id": "sum_bounds",
+      "input": "Σ_{k=0}^{n}{p_k}",
+      "classification": "nary",
+      "operator": "Σ",
+      "chr": "∑",
+      "limLoc": "undOvr",
+      "lower": "k=0",
+      "upper": "n",
+      "body": "p_k",
+      "trailing": "",
+      "domain": "generic",
+      "expected_omml": {
+        "tag": "m:nary",
+        "subHide": false,
+        "supHide": false,
+        "body_bound_to_m_e": true
+      },
+      "step2_severity": "warning",
+      "target_notices": [],
+      "code": "UNSUPPORTED_NARY"
+    },
+    {
+      "id": "sum_unicode",
+      "input": "∑_{k=0}^{n}{p_k}",
+      "classification": "nary",
+      "operator": "∑",
+      "chr": "∑",
+      "limLoc": "undOvr",
+      "lower": "k=0",
+      "upper": "n",
+      "body": "p_k",
+      "trailing": "",
+      "domain": "generic",
+      "expected_omml": {
+        "tag": "m:nary",
+        "subHide": false,
+        "supHide": false,
+        "body_bound_to_m_e": true
+      },
+      "step2_severity": "warning",
+      "target_notices": [],
+      "code": "UNSUPPORTED_NARY"
+    },
+    {
+      "id": "integral_no_limits",
+      "input": "∫{f(x)} dx",
+      "classification": "nary",
+      "operator": "∫",
+      "chr": "∫",
+      "limLoc": "subSup",
+      "lower": null,
+      "upper": null,
+      "body": "f(x)",
+      "trailing": " dx",
+      "domain": "generic",
+      "expected_omml": {
+        "tag": "m:nary",
+        "subHide": true,
+        "supHide": true,
+        "body_bound_to_m_e": true
+      },
+      "step2_severity": "warning",
+      "target_notices": [],
+      "code": "UNSUPPORTED_NARY"
+    },
+    {
+      "id": "nested_integral",
+      "input": "∫_{0}^{1}{∫_{x}^{2}{x e^{-y}} dy} dx",
+      "classification": "nary",
+      "operator": "∫",
+      "chr": "∫",
+      "limLoc": "subSup",
+      "lower": "0",
+      "upper": "1",
+      "body": "∫_{x}^{2}{x e^{-y}} dy",
+      "trailing": " dx",
+      "nary_count": 2,
+      "domain": "generic",
+      "expected_omml": {
+        "tag": "m:nary",
+        "subHide": false,
+        "supHide": false,
+        "body_bound_to_m_e": true
+      },
+      "step2_severity": "warning",
+      "target_notices": [],
+      "code": "UNSUPPORTED_NARY"
+    },
+    {
+      "id": "legacy_integral",
+      "input": "∫_x^2 x e^{-y} dy",
+      "classification": "legacy_nary",
+      "step2_severity": "warning",
+      "target_severity": "error",
+      "code": "LEGACY_NARY_BODY"
+    },
+    {
+      "id": "legacy_unit",
+      "input": "∫_0^1 dy",
+      "classification": "legacy_nary",
+      "step2_severity": "warning",
+      "target_severity": "error",
+      "rewrite": "∫_{0}^{1}{1} dy",
+      "code": "LEGACY_NARY_BODY"
+    },
+    {
+      "id": "unclosed_sub",
+      "input": "A_{ij",
+      "classification": "diagnostic",
+      "step2_severity": "error",
+      "target_severity": "error",
+      "code": "UNCLOSED_GROUP"
+    },
+    {
+      "id": "unclosed_sup",
+      "input": "A^{n+1",
+      "classification": "diagnostic",
+      "step2_severity": "error",
+      "target_severity": "error",
+      "code": "UNCLOSED_GROUP"
+    },
+    {
+      "id": "empty_sup",
+      "input": "A^{}",
+      "classification": "diagnostic",
+      "step2_severity": "error",
+      "target_severity": "error",
+      "code": "EMPTY_SCRIPT"
+    },
+    {
+      "id": "empty_sub",
+      "input": "A_{}",
+      "classification": "diagnostic",
+      "step2_severity": "error",
+      "target_severity": "error",
+      "code": "EMPTY_SCRIPT"
+    },
+    {
+      "id": "missing_operand",
+      "input": "^c",
+      "classification": "diagnostic",
+      "step2_severity": "error",
+      "target_severity": "error",
+      "code": "MISSING_OPERAND"
+    },
+    {
+      "id": "empty_integrand",
+      "input": "∫_{0}^{1}{} dy",
+      "classification": "diagnostic",
+      "step2_severity": "error",
+      "target_severity": "error",
+      "code": "EMPTY_NARY_BODY"
+    },
+    {
+      "id": "unclosed_integrand",
+      "input": "∫_{0}^{1}{x dy",
+      "classification": "diagnostic",
+      "step2_severity": "error",
+      "target_severity": "error",
+      "code": "UNCLOSED_GROUP"
+    },
+    {
+      "id": "ambiguous_cost",
+      "input": "A^cost",
+      "classification": "diagnostic",
+      "step2_severity": "error",
+      "target_severity": "error",
+      "code": "AMBIGUOUS_SCRIPT"
+    },
+    {
+      "id": "ambiguous_power",
+      "input": "x^2y",
+      "classification": "diagnostic",
+      "step2_severity": "error",
+      "target_severity": "error",
+      "code": "AMBIGUOUS_SCRIPT"
+    },
+    {
+      "id": "complement_partial",
+      "input": "A^{cc}",
+      "classification": "diagnostic",
+      "step2_severity": "error",
+      "target_severity": "error",
+      "code": "INVALID_DOMAIN_ARGUMENT"
+    },
+    {
+      "id": "complement_product",
+      "input": "A^cB^c",
+      "classification": "supported",
+      "domain": "mathematics",
+      "expected_kind_counts": {
+        "bar": 2
+      }
+    },
+    {
+      "id": "braced_scripts",
+      "input": "A_{ij}^c 与 x^{n+1}",
+      "classification": "supported",
+      "domain": "mathematics",
+      "expected_kind_counts": {
+        "bar": 1,
+        "sub": 1,
+        "sup": 1
+      }
+    },
+    {
+      "id": "greek_exponent",
+      "input": "λ^{|k|}",
+      "classification": "supported",
+      "domain": "generic",
+      "expected_kind_counts": {
+        "sup": 1
+      }
+    },
+    {
+      "id": "group_power",
+      "input": "(1−F(u))^{n}",
+      "classification": "supported",
+      "domain": "generic",
+      "expected_kind_counts": {
+        "sup": 1
+      }
+    }
+  ]
+}

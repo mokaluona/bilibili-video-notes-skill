@@ -1,0 +1,54 @@
+{
+  "fixture_version": 1,
+  "conventions": {
+    "row_semantics": "rendered row index; the table headers are row 0, so block['rows'][i] is row i+1",
+    "item_semantics": "index into a list block items array, 0-based",
+    "text_semantics": "runs merged at that coordinate; the exact string handed to add_text",
+    "span_unit": "Unicode code points, half-open offsets into text"
+  },
+  "block_ids_are_illustrative": true,
+  "real_block_ids": {
+    "table-1": "legacy-11",
+    "list-1": "legacy-7"
+  },
+  "cases": [
+    {
+      "block_id": "table-1",
+      "sub_path": {
+        "row": 1,
+        "col": 1
+      },
+      "text": "概率 A_{ij",
+      "text_span": [
+        3,
+        8
+      ],
+      "code": "UNCLOSED_GROUP"
+    },
+    {
+      "block_id": "table-1",
+      "sub_path": {
+        "row": 0,
+        "col": 0
+      },
+      "text": "A^{}",
+      "text_span": [
+        0,
+        4
+      ],
+      "code": "EMPTY_SCRIPT"
+    },
+    {
+      "block_id": "list-1",
+      "sub_path": {
+        "item": 1
+      },
+      "text": "A^{n+1",
+      "text_span": [
+        0,
+        6
+      ],
+      "code": "UNCLOSED_GROUP"
+    }
+  ]
+}

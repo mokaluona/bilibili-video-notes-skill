@@ -1,0 +1,577 @@
+{
+  "fixture_version": 1,
+  "status": "observed legacy behavior; separates missing capability (unsupported) from wrong output produced silently (silently_wrong, detected, correct); intentionally replaced during step 2",
+  "cases": [
+    {
+      "id": "integral_bounded",
+      "current_state": "unsupported",
+      "nodes": [
+        {
+          "kind": "text",
+          "text": "∫_{x}^{2}{x e^{-y}} dy",
+          "children": []
+        }
+      ],
+      "strict_error": "Missing mathematical operand before _; input='∫_{x}^{2}{x e^{-y}} dy'"
+    },
+    {
+      "id": "integral_unit",
+      "current_state": "unsupported",
+      "nodes": [
+        {
+          "kind": "text",
+          "text": "∫_{0}^{1}{1} dy",
+          "children": []
+        }
+      ],
+      "strict_error": "Missing mathematical operand before _; input='∫_{0}^{1}{1} dy'"
+    },
+    {
+      "id": "double_region",
+      "current_state": "unsupported",
+      "nodes": [
+        {
+          "kind": "text",
+          "text": "∬_{D}{f(x,y)} dx dy",
+          "children": []
+        }
+      ],
+      "strict_error": "Missing mathematical operand before _; input='∬_{D}{f(x,y)} dx dy'"
+    },
+    {
+      "id": "sum_bounds",
+      "current_state": "unsupported",
+      "nodes": [
+        {
+          "kind": "sup",
+          "text": "",
+          "children": [
+            {
+              "kind": "sub",
+              "text": "",
+              "children": [
+                {
+                  "kind": "text",
+                  "text": "Σ",
+                  "children": []
+                },
+                {
+                  "kind": "sequence",
+                  "text": "",
+                  "children": [
+                    {
+                      "kind": "text",
+                      "text": "k",
+                      "children": []
+                    },
+                    {
+                      "kind": "text",
+                      "text": "=",
+                      "children": []
+                    },
+                    {
+                      "kind": "text",
+                      "text": "0",
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "kind": "sequence",
+              "text": "",
+              "children": [
+                {
+                  "kind": "text",
+                  "text": "n",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "group",
+          "text": "{}",
+          "children": [
+            {
+              "kind": "sub",
+              "text": "",
+              "children": [
+                {
+                  "kind": "text",
+                  "text": "p",
+                  "children": []
+                },
+                {
+                  "kind": "sequence",
+                  "text": "",
+                  "children": [
+                    {
+                      "kind": "text",
+                      "text": "k",
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "strict_error": null
+    },
+    {
+      "id": "sum_unicode",
+      "current_state": "unsupported",
+      "nodes": [
+        {
+          "kind": "text",
+          "text": "∑_{k=0}^{n}{p_k}",
+          "children": []
+        }
+      ],
+      "strict_error": "Missing mathematical operand before _; input='∑_{k=0}^{n}{p_k}'"
+    },
+    {
+      "id": "integral_no_limits",
+      "current_state": "unsupported",
+      "nodes": [
+        {
+          "kind": "text",
+          "text": "∫{f(x)} dx",
+          "children": []
+        }
+      ],
+      "strict_error": null
+    },
+    {
+      "id": "nested_integral",
+      "current_state": "unsupported",
+      "nodes": [
+        {
+          "kind": "text",
+          "text": "∫_{0}^{1}{∫_{x}^{2}{x e^{-y}} dy} dx",
+          "children": []
+        }
+      ],
+      "strict_error": "Missing mathematical operand before _; input='∫_{0}^{1}{∫_{x}^{2}{x e^{-y}} dy} dx'"
+    },
+    {
+      "id": "legacy_integral",
+      "current_state": "unsupported",
+      "nodes": [
+        {
+          "kind": "text",
+          "text": "∫_x^2 x e^{-y} dy",
+          "children": []
+        }
+      ],
+      "strict_error": "Missing mathematical operand before _; input='∫_x^2 x e^{-y} dy'"
+    },
+    {
+      "id": "legacy_unit",
+      "current_state": "unsupported",
+      "nodes": [
+        {
+          "kind": "text",
+          "text": "∫_0^1 dy",
+          "children": []
+        }
+      ],
+      "strict_error": "Missing mathematical operand before _; input='∫_0^1 dy'"
+    },
+    {
+      "id": "unclosed_sub",
+      "current_state": "detected",
+      "nodes": [
+        {
+          "kind": "text",
+          "text": "A_{ij",
+          "children": []
+        }
+      ],
+      "strict_error": "Unclosed mathematical group: }; input='A_{ij'"
+    },
+    {
+      "id": "unclosed_sup",
+      "current_state": "detected",
+      "nodes": [
+        {
+          "kind": "text",
+          "text": "A^{n+1",
+          "children": []
+        }
+      ],
+      "strict_error": "Unclosed mathematical group: }; input='A^{n+1'"
+    },
+    {
+      "id": "empty_sup",
+      "current_state": "silently_wrong",
+      "nodes": [
+        {
+          "kind": "sup",
+          "text": "",
+          "children": [
+            {
+              "kind": "text",
+              "text": "A",
+              "children": []
+            },
+            {
+              "kind": "sequence",
+              "text": "",
+              "children": []
+            }
+          ]
+        }
+      ],
+      "strict_error": null
+    },
+    {
+      "id": "empty_sub",
+      "current_state": "silently_wrong",
+      "nodes": [
+        {
+          "kind": "sub",
+          "text": "",
+          "children": [
+            {
+              "kind": "text",
+              "text": "A",
+              "children": []
+            },
+            {
+              "kind": "sequence",
+              "text": "",
+              "children": []
+            }
+          ]
+        }
+      ],
+      "strict_error": null
+    },
+    {
+      "id": "missing_operand",
+      "current_state": "detected",
+      "nodes": [
+        {
+          "kind": "text",
+          "text": "^c",
+          "children": []
+        }
+      ],
+      "strict_error": "Missing mathematical operand before ^; input='^c'"
+    },
+    {
+      "id": "empty_integrand",
+      "current_state": "detected",
+      "nodes": [
+        {
+          "kind": "text",
+          "text": "∫_{0}^{1}{} dy",
+          "children": []
+        }
+      ],
+      "strict_error": "Missing mathematical operand before _; input='∫_{0}^{1}{} dy'"
+    },
+    {
+      "id": "unclosed_integrand",
+      "current_state": "detected",
+      "nodes": [
+        {
+          "kind": "text",
+          "text": "∫_{0}^{1}{x dy",
+          "children": []
+        }
+      ],
+      "strict_error": "Missing mathematical operand before _; input='∫_{0}^{1}{x dy'"
+    },
+    {
+      "id": "ambiguous_cost",
+      "current_state": "silently_wrong",
+      "nodes": [
+        {
+          "kind": "bar",
+          "text": "",
+          "children": [
+            {
+              "kind": "text",
+              "text": "A",
+              "children": []
+            }
+          ]
+        },
+        {
+          "kind": "text",
+          "text": "o",
+          "children": []
+        },
+        {
+          "kind": "text",
+          "text": "s",
+          "children": []
+        },
+        {
+          "kind": "text",
+          "text": "t",
+          "children": []
+        }
+      ],
+      "strict_error": null
+    },
+    {
+      "id": "ambiguous_power",
+      "current_state": "silently_wrong",
+      "nodes": [
+        {
+          "kind": "sup",
+          "text": "",
+          "children": [
+            {
+              "kind": "text",
+              "text": "x",
+              "children": []
+            },
+            {
+              "kind": "sequence",
+              "text": "",
+              "children": [
+                {
+                  "kind": "text",
+                  "text": "2y",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "strict_error": null
+    },
+    {
+      "id": "complement_partial",
+      "current_state": "detected",
+      "nodes": [
+        {
+          "kind": "text",
+          "text": "A^{cc}",
+          "children": []
+        }
+      ],
+      "strict_error": "Braced script must match the complete domain argument; input='A^{cc}'"
+    },
+    {
+      "id": "complement_product",
+      "current_state": "correct",
+      "nodes": [
+        {
+          "kind": "bar",
+          "text": "",
+          "children": [
+            {
+              "kind": "text",
+              "text": "A",
+              "children": []
+            }
+          ]
+        },
+        {
+          "kind": "bar",
+          "text": "",
+          "children": [
+            {
+              "kind": "text",
+              "text": "B",
+              "children": []
+            }
+          ]
+        }
+      ],
+      "strict_error": null
+    },
+    {
+      "id": "braced_scripts",
+      "current_state": "correct",
+      "nodes": [
+        {
+          "kind": "bar",
+          "text": "",
+          "children": [
+            {
+              "kind": "sub",
+              "text": "",
+              "children": [
+                {
+                  "kind": "text",
+                  "text": "A",
+                  "children": []
+                },
+                {
+                  "kind": "sequence",
+                  "text": "",
+                  "children": [
+                    {
+                      "kind": "text",
+                      "text": "i",
+                      "children": []
+                    },
+                    {
+                      "kind": "text",
+                      "text": "j",
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "text",
+          "text": " ",
+          "children": []
+        },
+        {
+          "kind": "text",
+          "text": "与",
+          "children": []
+        },
+        {
+          "kind": "text",
+          "text": " ",
+          "children": []
+        },
+        {
+          "kind": "sup",
+          "text": "",
+          "children": [
+            {
+              "kind": "text",
+              "text": "x",
+              "children": []
+            },
+            {
+              "kind": "sequence",
+              "text": "",
+              "children": [
+                {
+                  "kind": "text",
+                  "text": "n",
+                  "children": []
+                },
+                {
+                  "kind": "text",
+                  "text": "+",
+                  "children": []
+                },
+                {
+                  "kind": "text",
+                  "text": "1",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "strict_error": null
+    },
+    {
+      "id": "greek_exponent",
+      "current_state": "correct",
+      "nodes": [
+        {
+          "kind": "sup",
+          "text": "",
+          "children": [
+            {
+              "kind": "text",
+              "text": "λ",
+              "children": []
+            },
+            {
+              "kind": "sequence",
+              "text": "",
+              "children": [
+                {
+                  "kind": "text",
+                  "text": "|",
+                  "children": []
+                },
+                {
+                  "kind": "text",
+                  "text": "k",
+                  "children": []
+                },
+                {
+                  "kind": "text",
+                  "text": "|",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "strict_error": null
+    },
+    {
+      "id": "group_power",
+      "current_state": "correct",
+      "nodes": [
+        {
+          "kind": "sup",
+          "text": "",
+          "children": [
+            {
+              "kind": "group",
+              "text": "()",
+              "children": [
+                {
+                  "kind": "text",
+                  "text": "1",
+                  "children": []
+                },
+                {
+                  "kind": "text",
+                  "text": "−",
+                  "children": []
+                },
+                {
+                  "kind": "text",
+                  "text": "F",
+                  "children": []
+                },
+                {
+                  "kind": "group",
+                  "text": "()",
+                  "children": [
+                    {
+                      "kind": "text",
+                      "text": "u",
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "kind": "sequence",
+              "text": "",
+              "children": [
+                {
+                  "kind": "text",
+                  "text": "n",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "strict_error": null
+    }
+  ]
+}
