@@ -32,10 +32,14 @@ parse 恒定返回 ParseResult(nodes, notices)，删除 strict 通道。预期�
 
 `sub_path` 的行号是**渲染行序号**：表格表头为 row 0，因此 `block['rows'][i]` 对应 row=i+1；列表用 0 基 `item`；`col` 为 0 基列号。`text` 是**该坐标处各 run 合并后**的文本，也就是交给 `add_text` 的那个字符串；单元格和列表条目在模型里都是 run 数组，不先合并就取不到稳定偏移。`text_span` 是相对该文本的 Unicode 字符左闭右开偏移，与字幕/截图 source_refs 无关。
 
-结构报告在第二步由模板入口产生，在第四步模板变薄之前迁入核心；第五步接入 continuation 与 quality。报告缺失、未运行或构建失配均 blocking。结构错误不得改写字幕覆盖分数。
+按第二步实施中的补充要求，结构报告落盘和模板预检推迟到第四步。本步仅返回 Notice，不新增交付质量门。第四步模板变薄前由核心承接报告生产，第五步接入 continuation 与 quality；届时报告缺失、未运行或构建失配均 blocking。结构错误不得改写字幕覆盖分数。
 
 ## 后续验收
 
 第二步将现状快照改为 code/severity/text_span 断言，并按 `current_state` 分批：先 `unsupported`（补 nary），再 `silently_wrong` 四项（这四个是当前已经在产出错误结果，不是缺功能），最后 `detected` 六项转 blocking。第四步对 formula_cases 的期望执行真实 OMML 检查，检查 m:naryPr、chr、limLoc、隐藏状态以及 m:e 的主体。再实际渲染求和、积分、嵌套、复杂上下标和跨页表格；当前第一步没有宣称视觉兼容或未来公式能力通过。
 
 临时脚本继续保留，直到有效能力被固定用例与核心实现接替。AGENTS.md、README.md、生产入口、schema 与解析行为在本步均不改动。
+
+## 第二步实现状态
+
+现状快照保留为历史材料，运行时不再对拍错误解析树。test_formula_diagnostics 对23项语料及独立错误类别执行新规格断言。原生 nary 发射、Renderer 迁移、schema 升级和结构报告接线均未实施。重复表头修复已从 Parser 阶段撤出，其基准恢复未修复状态；后续独立验收和提交。

@@ -21,20 +21,20 @@ class FormulaTests(unittest.TestCase):
         self.assertIn('C00000',p._p.xml)
         self.assertIn('\u2009',p._p.xml)
     def test_generic_and_scripts(self):
-        self.assertEqual(parse('A^c','generic')[-1].kind,'sup')
+        self.assertEqual(parse('A^c','generic').nodes[-1].kind,'sup')
         d=Document();p=d.add_paragraph();add_text(p,'A_{ij}^c 与 x^{n+1}')
         self.assertEqual(len(list(p._p.iter(qn('m:sSub')))),1)
         self.assertEqual(len(list(p._p.iter(qn('m:sSup')))),1)
         self.assertEqual(len(list(p._p.iter(qn('m:bar')))),1)
-        expression=parse('p^k(1−p)^(n−k)')
+        expression=parse('p^k(1−p)^(n−k)').nodes
         self.assertEqual(sum(n.kind=='sup' for n in expression),2)
     def test_domain_registration(self):
         register_domain('test_physics',lambda op,arg:('bar',3) if op=='^' and arg.startswith('avg') else None)
-        self.assertEqual(parse('v^{avg}','test_physics')[-1].kind,'bar')
+        self.assertEqual(parse('v^{avg}','test_physics').nodes[-1].kind,'bar')
     def test_invalid_and_prose(self):
-        self.assertEqual(parse('正文（普通文字）')[0].text,'正文（普通文字）')
+        self.assertEqual(parse('正文（普通文字）').nodes[0].text,'正文（普通文字）')
         for s in ('^c','A^','(AB^c','A_'):
-            with self.assertRaises(ValueError):parse(s,strict=True)
+            self.assertTrue(any(n.severity == 'error' for n in parse(s).notices))
     def test_generators(self):
         for filename in ('gen_docx_dynamic.py','docx_note_v2.py'):
             path=Path(__file__).resolve().parents[1]/'templates'/filename
@@ -55,17 +55,16 @@ class FormulaTests(unittest.TestCase):
 
     def test_prose_fallback(self):
         for text in ('填空：____','变量 _ 未定义','见下图__','A_','成本^收益'):
-            self.assertEqual(parse(text)[0].text,text)
-        with self.assertRaisesRegex(ValueError,'input='):
-            parse('A_',strict=True)
+            self.assertEqual(parse(text).nodes[0].text,text)
+        self.assertEqual(parse('A_').notices[0].code, 'MISSING_SCRIPT')
 
     def test_domain_consumption(self):
         register_domain('probe_review',lambda op,arg:('bar',1) if op=='^' and arg.startswith('c') else None)
-        nodes=parse('A^cB^c','probe_review')
+        nodes=parse('A^cB^c','probe_review').nodes
         self.assertEqual([n.kind for n in nodes],['bar','bar'])
         self.assertEqual([n.children[0].text for n in nodes],['A','B'])
-        self.assertEqual(parse('A^{c}','probe_review')[-1].kind,'bar')
-        self.assertEqual(parse('A^C')[-1].kind,'bar')
+        self.assertEqual(parse('A^{c}','probe_review').nodes[-1].kind,'bar')
+        self.assertEqual(parse('A^C').nodes[-1].kind,'bar')
 
     def test_rule_consulted_once(self):
         seen=[]
@@ -73,7 +72,7 @@ class FormulaTests(unittest.TestCase):
             seen.append((op,arg))
             return ('bar',1) if op=='^' and len(arg)>1 and arg.startswith('c') else None
         register_domain('once_review',length_sensitive)
-        self.assertEqual([n.kind for n in parse('A^cB','once_review')],['bar','text'])
+        self.assertEqual([n.kind for n in parse('A^cB','once_review').nodes],['bar','text'])
         self.assertEqual(list(b for b in seen if b[0]=='^'),[('^','cB')])
 
     def test_verifier_uppercase(self):

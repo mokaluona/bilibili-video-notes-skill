@@ -1,6 +1,6 @@
 {
   "fixture_version": 1,
-  "baseline": "templates before step 2 patch",
+  "baseline": "templates before separate header fix",
   "template": {
     "body_size": 13,
     "formula_size": 15,
@@ -23,5 +23,5 @@
     "repeat_header": true,
     "formula_font": "宋体"
   },
-  "next_baseline_action": "Step 2 updates repeat_header baseline and its test together after the tblHeader patch. core_current.formula_font records that core formulas render in the body font, not the template math font; core_current.caption_prefix is a format string, template.caption_prefix is a literal prefix."
+  "next_baseline_action": "Header fix withdrawn from parser stage; validate and commit it separately."
 }
